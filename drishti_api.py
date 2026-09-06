@@ -15,6 +15,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import json
 import urllib.parse
 from datetime import datetime
+from fusion_engine import FusionEngine
 
 PORT = 8080
 
@@ -39,6 +40,9 @@ DATABASE = {
         }
     ]
 }
+
+# Initialize the Multi-Modal Fusion Engine
+fusion_engine = FusionEngine()
 
 class DrishtiAPIHandler(BaseHTTPRequestHandler):
 
@@ -70,6 +74,7 @@ class DrishtiAPIHandler(BaseHTTPRequestHandler):
                     "GET  /api/health",
                     "GET  /api/detections",
                     "POST /api/edge/telemetry",
+                    "GET  /api/fusion/status",
                     "GET  /api/equinox/workorders",
                     "POST /api/equinox/dispatch"
                 ]
@@ -82,6 +87,21 @@ class DrishtiAPIHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({
                 "count": len(DATABASE["detections"]),
                 "detections": DATABASE["detections"]
+            }, indent=2).encode('utf-8'))
+
+        elif path == "/api/fusion/status":
+            self._set_headers(200)
+            # Peek at current weather cache
+            weather = fusion_engine.weather_cache.get("data")
+            if not weather:
+                weather = fusion_engine.get_live_weather(28.6139, 77.2090) # Default Delhi
+            _, rho = fusion_engine.calculate_correlation_discount(2, weather["humidity"], weather["precipitation"])
+            
+            self.wfile.write(json.dumps({
+                "module": "DRISHTI Multi-Modal Fusion Engine",
+                "active_context": "Open-Meteo Synoptic Weather",
+                "current_weather": weather,
+                "current_environmental_correlation_rho": rho
             }, indent=2).encode('utf-8'))
 
         elif path == "/api/equinox/workorders":
@@ -116,7 +136,8 @@ class DrishtiAPIHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": f"Missing required fields: {missing}"}).encode('utf-8'))
                 return
 
-            event = {
+            # Build raw event
+            raw_event = {
                 "event_id": f"EVT-{len(DATABASE['detections']) + 1:04d}",
                 "bus_id": payload.get("bus_id"),
                 "hazard_type": payload.get("hazard_type"),
@@ -127,14 +148,26 @@ class DrishtiAPIHandler(BaseHTTPRequestHandler):
                 "payload_bytes": len(post_body),
                 "received_at": datetime.utcnow().isoformat() + "Z"
             }
-            DATABASE["detections"].append(event)
+            
+            # --- FUSION ENGINE INTERVENTION ---
+            # Simulate fetching historical detections and MCD 311 tickets in a 50m radius
+            historical_mock = [d for d in DATABASE["detections"] if d.get("hazard_type") == raw_event["hazard_type"]][:2]
+            mcd311_mock = [{"ticket_id": "#MCD-2026-9481"}] if raw_event["hazard_type"] == "Pothole" else []
+            
+            # Fuse the event
+            fused_event = fusion_engine.fuse_event(raw_event, historical_mock, mcd311_mock)
+            
+            # Combine raw and fused for storage
+            final_record = {**raw_event, "fusion_result": fused_event}
+            DATABASE["detections"].append(final_record)
 
             self._set_headers(201)
             self.wfile.write(json.dumps({
-                "status": "INGESTED",
+                "status": "INGESTED_AND_FUSED",
                 "bandwidth_bytes": len(post_body),
                 "bandwidth_saved_pct": "99.8%",
-                "event": event
+                "raw_event": raw_event,
+                "fusion_intelligence": fused_event
             }, indent=2).encode('utf-8'))
 
         # 2. Automated Dispatch into BEL Equinox (NGSI-LD Standard)

@@ -56,15 +56,15 @@ class BELEquinoxConnector:
     def publish_hazard_entity(self, hazard_data):
         """Step 3: Publish fused road hazard into Equinox NGSI-LD Context Broker"""
         ngsi_payload = {
-            "id": f"urn:ngsi-ld:RoadHazard:{hazard_data['segment_id']}",
+            "id": f"urn:ngsi-ld:RoadHazard:EVT-{hazard_data.get('timestamp')}",
             "type": "RoadHazard",
-            "hazardType": {"type": "Property", "value": hazard_data["type"]},
-            "fusedPriority": {"type": "Property", "value": hazard_data["priority"]},
-            "rawConfidence": {"type": "Property", "value": hazard_data["confidence"]},
-            "effectiveBuses": {"type": "Property", "value": hazard_data["n_eff"]},
-            "depthCalibratedMm": {"type": "Property", "value": hazard_data["depth_mm"]},
-            "transitDelayMin": {"type": "Property", "value": hazard_data["transit_delay_min"]},
-            "mcd311Corroborated": {"type": "Property", "value": hazard_data["mcd_ticket"]},
+            "hazardType": {"type": "Property", "value": hazard_data.get("hazard_type", "Unknown")},
+            "fusedPriority": {"type": "Property", "value": hazard_data.get("priority_level", "LOW")},
+            "rawConfidence": {"type": "Property", "value": hazard_data.get("raw_confidence", 0.0)},
+            "fusedConfidence": {"type": "Property", "value": hazard_data.get("fused_confidence", 0.0)},
+            "effectiveBuses": {"type": "Property", "value": hazard_data.get("effective_passes_neff", 1.0)},
+            "escalationReason": {"type": "Property", "value": hazard_data.get("escalation_reason", "")},
+            "weatherContext": {"type": "Property", "value": hazard_data.get("weather_context", {})},
             "location": {
                 "type": "GeoProperty",
                 "value": {
