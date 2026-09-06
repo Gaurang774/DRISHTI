@@ -32,6 +32,7 @@
                 <li title="God's Eye Live Map"><i class="ph ph-map-trifold"></i> <span>Live Map</span></li>
                 <li title="DTC Bus Fleet OSINT" id="nav-fleet"><i class="ph ph-bus"></i> <span>Fleet Monitor</span></li>
                 <li title="Hazard Hotspots" id="nav-hazards"><i class="ph ph-warning-octagon"></i> <span>Road Intelligence</span></li>
+                <li title="Traffic Analytics" id="nav-analytics" onclick="toggleAnalyticsPanel()"><i class="ph ph-chart-bar"></i> <span>Traffic Analytics</span></li>
                 <li title="ANPR Mobile Surveillance"><i class="ph ph-scan"></i> <span>Incidents & Safety</span></li>
                 <li title="MCD 311 Citizen Grievance" id="nav-grievance"><i class="ph ph-clipboard-text"></i> <span>Civic Integration</span></li>
             </ul>
@@ -169,6 +170,7 @@
                         <button class="layer-pill active" data-layer="damage"><i class="ph ph-warning"></i> Road Hazards</button>
                         <button class="layer-pill active" data-layer="waterlog"><i class="ph ph-drop"></i> Weather</button>
                         <button class="layer-pill active" data-layer="mcd311"><i class="ph ph-clipboard-text"></i> MCD 311</button>
+                        <button class="layer-pill" data-layer="roadcondition"><i class="ph ph-thermometer"></i> Road Condition</button>
                     </div>
                 </div>
 
@@ -583,7 +585,87 @@
                 </div>
             </div>
             <div class="wo-footer">
+                <button class="btn-wo-download" id="btn-wo-download" onclick="downloadIncidentReport()" title="Download ETSI NGSI-LD Incident Report"><i class="ph ph-file-arrow-down"></i> DOWNLOAD INCIDENT REPORT</button>
                 <button class="btn-wo-confirm" id="btn-wo-confirm">ACKNOWLEDGE WORK ORDER & RETURN TO MAP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Traffic Analytics Overlay Panel -->
+    <div class="analytics-panel-overlay hidden" id="analytics-panel">
+        <div class="analytics-panel glass-panel">
+            <div class="analytics-header">
+                <h2><i class="ph ph-chart-bar"></i> TRAFFIC & ROAD ANALYTICS</h2>
+                <button class="icon-btn" onclick="toggleAnalyticsPanel()"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="analytics-body">
+                <!-- Row 1: Summary KPIs -->
+                <div class="analytics-kpi-row">
+                    <div class="a-kpi"><div class="a-kpi-val" style="color: var(--cyan)">247</div><div class="a-kpi-lbl">Buses Online</div></div>
+                    <div class="a-kpi"><div class="a-kpi-val" style="color: var(--green)">1,842 km</div><div class="a-kpi-lbl">Scanned Today</div></div>
+                    <div class="a-kpi"><div class="a-kpi-val" style="color: var(--critical)">14</div><div class="a-kpi-lbl">Critical Zones</div></div>
+                    <div class="a-kpi"><div class="a-kpi-val" style="color: var(--green)">0.0%</div><div class="a-kpi-lbl">False Escalation</div></div>
+                </div>
+
+                <!-- Row 2: Hazard Type Breakdown -->
+                <div class="analytics-section">
+                    <div class="a-section-title">DETECTION BREAKDOWN BY HAZARD TYPE</div>
+                    <div class="bar-chart" id="hazard-chart">
+                        <div class="bar-row"><span class="bar-label">Potholes (D40)</span><div class="bar-track"><div class="bar-fill" style="width:72%;background:var(--critical)"></div></div><span class="bar-val">42</span></div>
+                        <div class="bar-row"><span class="bar-label">Waterlogging</span><div class="bar-track"><div class="bar-fill" style="width:31%;background:var(--cyan)"></div></div><span class="bar-val">18</span></div>
+                        <div class="bar-row"><span class="bar-label">Signage Defects</span><div class="bar-track"><div class="bar-fill" style="width:22%;background:var(--medium)"></div></div><span class="bar-val">13</span></div>
+                        <div class="bar-row"><span class="bar-label">Road Cracks (D20)</span><div class="bar-track"><div class="bar-fill" style="width:17%;background:var(--purple)"></div></div><span class="bar-val">10</span></div>
+                        <div class="bar-row"><span class="bar-label">ANPR Events</span><div class="bar-track"><div class="bar-fill" style="width:12%;background:var(--green)"></div></div><span class="bar-val">7</span></div>
+                    </div>
+                </div>
+
+                <!-- Row 3: Top 5 Worst Corridors -->
+                <div class="analytics-section">
+                    <div class="a-section-title">TOP 5 WORST CORRIDORS (FUSION RANKED)</div>
+                    <div class="corridor-table">
+                        <div class="corridor-row critical-row">
+                            <span class="corridor-rank">#1</span>
+                            <span class="corridor-name">Connaught Place Radial 3</span>
+                            <span class="corridor-score" style="color:var(--critical)">CRITICAL</span>
+                            <span class="corridor-detail">7 buses • +11.4m delay</span>
+                        </div>
+                        <div class="corridor-row">
+                            <span class="corridor-rank">#2</span>
+                            <span class="corridor-name">AIIMS/IIT Underpass</span>
+                            <span class="corridor-score" style="color:var(--critical)">CRITICAL</span>
+                            <span class="corridor-detail">18cm flooding</span>
+                        </div>
+                        <div class="corridor-row">
+                            <span class="corridor-rank">#3</span>
+                            <span class="corridor-name">ITO Junction (Vikas Marg)</span>
+                            <span class="corridor-score" style="color:var(--medium)">MEDIUM</span>
+                            <span class="corridor-detail">Sign tilt 34°</span>
+                        </div>
+                        <div class="corridor-row">
+                            <span class="corridor-rank">#4</span>
+                            <span class="corridor-name">Vikas Marg Pavement</span>
+                            <span class="corridor-score" style="color:var(--medium)">MEDIUM</span>
+                            <span class="corridor-detail">Crack cluster D20</span>
+                        </div>
+                        <div class="corridor-row">
+                            <span class="corridor-rank">#5</span>
+                            <span class="corridor-name">Outer Ring Road (Lajpat)</span>
+                            <span class="corridor-score" style="color:var(--low)">LOW</span>
+                            <span class="corridor-detail">1 pass • MONITOR</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 4: Road Condition Summary -->
+                <div class="analytics-section">
+                    <div class="a-section-title">ROAD CONDITION MAP SUMMARY (CITY-WIDE)</div>
+                    <div class="road-condition-grid">
+                        <div class="rc-item"><div class="rc-dot" style="background:#10b981"></div><span>Good</span><strong>68%</strong></div>
+                        <div class="rc-item"><div class="rc-dot" style="background:#f59e0b"></div><span>Fair</span><strong>18%</strong></div>
+                        <div class="rc-item"><div class="rc-dot" style="background:#ef4444"></div><span>Poor</span><strong>11%</strong></div>
+                        <div class="rc-item"><div class="rc-dot" style="background:#7c3aed"></div><span>Critical</span><strong>3%</strong></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
