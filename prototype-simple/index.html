@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CITY EYE • Mobile Intelligence for Smarter Cities</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Scan line overlay for cinematic God's Eye effect -->
+    <div class="scanline-overlay"></div>
+
+    <div class="app-container">
+        <!-- Left Nav Sidebar -->
+        <nav class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="ph-fill ph-eye"></i>
+                </div>
+                <div class="logo-text-group">
+                    <span class="logo-text-main">CITY EYE</span>
+                    <span class="logo-text-sub">Buses See. Cities Act.</span>
+                </div>
+            </div>
+            <ul class="nav-links">
+                <li class="active" title="Dashboard"><i class="ph ph-squares-four"></i> <span>Dashboard</span></li>
+                <li title="God's Eye Live Map"><i class="ph ph-map-trifold"></i> <span>Live Map</span></li>
+                <li title="DTC Bus Fleet OSINT" id="nav-fleet"><i class="ph ph-bus"></i> <span>Fleet Monitor</span></li>
+                <li title="Hazard Hotspots" id="nav-hazards"><i class="ph ph-warning-octagon"></i> <span>Road Intelligence</span></li>
+                <li title="ANPR Mobile Surveillance"><i class="ph ph-scan"></i> <span>Incidents & Safety</span></li>
+                <li title="MCD 311 Citizen Grievance" id="nav-grievance"><i class="ph ph-clipboard-text"></i> <span>Civic Integration</span></li>
+            </ul>
+            <div class="sidebar-bottom">
+                <div class="connected-fleet">
+                    <i class="ph ph-bus"></i>
+                    <div class="fleet-stats">
+                        <span class="fleet-count">247 / 320</span>
+                        <span class="fleet-label">Buses Online</span>
+                    </div>
+                </div>
+                <li title="Data OS Inspector" id="btn-open-osint-side"><i class="ph ph-database"></i> <span>Data OS</span></li>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+
+            <!-- Top Command Bar -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <div class="title-row">
+                        <h1>Mobile Intelligence for Smarter Cities</h1>
+                    </div>
+                    <div class="system-tagline">
+                        AI-powered insights from public transport fleet &nbsp;|&nbsp; Integrated with <span>BEL EQUINOX</span>
+                    </div>
+                </div>
+
+                <div class="top-bar-center">
+                    <!-- City Selector -->
+                    <div class="city-picker">
+                        <i class="ph ph-map-pin"></i>
+                        <select id="city-selector">
+                            <option value="delhi" selected>Delhi NCR (DTC / MCD 311)</option>
+                            <option value="mumbai">Mumbai (BEST / BMC 24x7)</option>
+                            <option value="bengaluru">Bengaluru (BMTC / BBMP)</option>
+                        </select>
+                    </div>
+
+                    <!-- Live Weather OSINT Telemetry (Open-Meteo API) -->
+                    <div class="weather-chip" id="weather-chip" title="Live weather telemetry via Open-Meteo API">
+                        <i class="ph ph-cloud-rain" id="weather-icon"></i>
+                        <span id="weather-info">Delhi: 25.0°C • Hum 91%</span>
+                        <span class="weather-alert-tag" id="weather-discount-badge" title="High humidity/rain automatically initiates correlated camera uncertainty discount">CALIB ρ=0.72</span>
+                    </div>
+                </div>
+
+                <div class="top-bar-right">
+                    <button class="btn-demo-run" id="btn-run-demo" title="Run 1-Click Interactive Demonstration for Judges">
+                        <i class="ph-fill ph-play-circle"></i>
+                        <span>1-CLICK JUDGE DEMO</span>
+                    </button>
+                    <button class="btn-osint-hud" id="btn-toggle-osint-modal">
+                        <i class="ph ph-brackets-curly"></i>
+                        <span>DATA OS INGESTION</span>
+                    </button>
+                    <div class="clock" id="live-clock">--:--:--</div>
+                </div>
+            </header>
+
+            <!-- KPI Strip -->
+            <div class="kpi-strip">
+                <div class="kpi-card" id="card-buses">
+                    <div class="kpi-icon"><i class="ph ph-bus"></i></div>
+                    <div class="kpi-data">
+                        <div class="kpi-value" id="kpi-buses">48</div>
+                        <div class="kpi-label">Active DTC Buses</div>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon"><i class="ph ph-path"></i></div>
+                    <div class="kpi-data">
+                        <div class="kpi-value" id="kpi-segments">1,420</div>
+                        <div class="kpi-label">OSM Road Segments</div>
+                    </div>
+                </div>
+                <div class="kpi-card alert">
+                    <div class="kpi-icon"><i class="ph ph-warning-circle"></i></div>
+                    <div class="kpi-data">
+                        <div class="kpi-value" id="kpi-critical">14</div>
+                        <div class="kpi-label">Critical Hazards</div>
+                    </div>
+                </div>
+                <div class="kpi-card osint-card">
+                    <div class="kpi-icon"><i class="ph ph-files"></i></div>
+                    <div class="kpi-data">
+                        <div class="kpi-value" id="kpi-mcd">27</div>
+                        <div class="kpi-label">MCD 311 Tickets</div>
+                    </div>
+                </div>
+                <div class="kpi-card highlight-card">
+                    <div class="kpi-icon"><i class="ph ph-shield-check"></i></div>
+                    <div class="kpi-data">
+                        <div class="kpi-value" id="kpi-fusion">92.4%</div>
+                        <div class="kpi-label">Fusion Confidence</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Core Grid -->
+            <div class="dashboard-core">
+                <!-- Left Column -->
+                <div class="left-panel">
+                    <div class="live-feed-panel glass-panel">
+                        <div class="panel-title">
+                            <i class="ph ph-list-dashes"></i>
+                            <span>LIVE DETECTIONS</span>
+                            <div class="live-indicator-wrap"><div class="live-indicator"></div> Live</div>
+                        </div>
+                        <div class="feed-filters">
+                            <button class="active">All (28)</button>
+                            <button>Road (12)</button>
+                            <button>Traffic (8)</button>
+                        </div>
+                        <div class="feed-list" id="alert-feed-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center Column (Map) -->
+                <div class="center-panel glass-panel">
+                    <!-- Search Bar in Map -->
+                    <div class="map-search-bar">
+                        <i class="ph ph-magnifying-glass"></i>
+                        <input type="text" placeholder="Search Delhi..." />
+                    </div>
+                    <!-- Leaflet Map Container -->
+                    <div id="map-container"></div>
+                    <!-- Interactive Map Layer Filter Pills -->
+                    <div class="layer-filter-bar">
+                        <button class="layer-pill active" data-layer="all">All Layers</button>
+                        <button class="layer-pill active" data-layer="buses"><i class="ph ph-bus"></i> Buses</button>
+                        <button class="layer-pill active" data-layer="damage"><i class="ph ph-warning"></i> Road Hazards</button>
+                        <button class="layer-pill active" data-layer="waterlog"><i class="ph ph-drop"></i> Weather</button>
+                        <button class="layer-pill active" data-layer="mcd311"><i class="ph ph-clipboard-text"></i> MCD 311</button>
+                    </div>
+                </div>
+
+                <!-- Right Column (Intel) -->
+                <aside class="intel-panel glass-panel" id="intel-panel">
+                    <div class="intel-header">
+                        <h2><i class="ph ph-brain"></i> HAZARD DETAILS</h2>
+                        <button id="close-intel" class="icon-btn"><i class="ph ph-x"></i></button>
+                    </div>
+                    <div id="intel-empty" class="intel-empty">
+                        <div class="pulse-ring"></div>
+                        <i class="ph ph-crosshair"></i>
+                        <p class="empty-title">Select Any Road Segment or Hotspot</p>
+                    </div>
+                    <div id="intel-content" class="intel-content hidden"></div>
+                </aside>
+            </div>
+
+            <!-- Bottom Camera Feeds -->
+            <div class="dashboard-bottom">
+                <div class="bottom-header">
+                    <div class="bottom-title"><div class="live-indicator"></div> Live Bus Feeds</div>
+                    <a href="#" class="view-all">View All <i class="ph ph-caret-right"></i></a>
+                </div>
+                
+                <div class="camera-strip">
+                    <!-- Cam 1: Pothole Detection with Depth Sensor -->
+                    <div class="camera-feed glass-panel" id="cam-1" title="Click to focus on Bus 402">
+                        <div class="cam-header">
+                            <span class="cam-label"><i class="ph ph-video-camera"></i> BUS 402 • FRONT CAMERA</span>
+                            <span class="cam-status recording">REC</span>
+                        </div>
+                        <div class="cam-view">
+                            <img src="assets/dashcam_pothole.jpg" class="cam-img" alt="Delhi Bus Windshield View">
+                            <div class="cam-overlay">
+                                <div class="detection-box pothole">
+                                    <span>POTHOLE D40 • 89%</span>
+                                    <div class="box-meta">DEPTH: 4.8cm • VOL: 0.12m³</div>
+                                </div>
+                                <div class="sensor-readout">
+                                    <span>DEPTH LIDAR: 48mm</span>
+                                    <span>LENS CALIB: 0.92</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cam-footer">
+                            <span>28.6139°N, 77.2090°E • RING RD</span>
+                            <span class="cam-fps">30 FPS • 1080p</span>
+                        </div>
+                    </div>
+
+                    <!-- Cam 2: Traffic Sign Deficiency -->
+                    <div class="camera-feed glass-panel" id="cam-2" title="Click to focus on Bus 119">
+                        <div class="cam-header">
+                            <span class="cam-label"><i class="ph ph-video-camera"></i> BUS 119 • SIDE ANGLE</span>
+                            <span class="cam-status recording">REC</span>
+                        </div>
+                        <div class="cam-view">
+                            <img src="assets/dashcam_sign.jpg" class="cam-img" alt="Side View Road Sign">
+                            <div class="cam-overlay">
+                                <div class="detection-box sign">
+                                    <span>SIGN DEFICIENT • 72%</span>
+                                    <div class="box-meta">TILT: 34° • ILLEGIBLE</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cam-footer">
+                            <span>28.6180°N, 77.2150°E • ITO JCT</span>
+                            <span class="cam-fps">30 FPS • 1080p</span>
+                        </div>
+                    </div>
+
+                    <!-- Cam 3: Monsoon Flooding / Underpass Waterlogging -->
+                    <div class="camera-feed glass-panel" id="cam-3" title="Click to focus on Bus 880">
+                        <div class="cam-header">
+                            <span class="cam-label"><i class="ph ph-video-camera"></i> BUS 880 • FRONT UNDERPASS</span>
+                            <span class="cam-status recording">REC</span>
+                        </div>
+                        <div class="cam-view">
+                            <img src="assets/dashcam_waterlog.jpg" class="cam-img" alt="Waterlogging Flood View">
+                            <div class="cam-overlay">
+                                <div class="detection-box waterlog">
+                                    <span>WATERLOGGING HAZARD • 94%</span>
+                                    <div class="box-meta">DEPTH: 18cm • SUBMERGED LANE</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cam-footer">
+                            <span>28.5702°N, 77.2081°E • AIIMS/IIT</span>
+                            <span class="cam-fps">30 FPS • 1080p</span>
+                        </div>
+                    </div>
+
+                    <!-- Cam 4: Rear ANPR Camera with High-Tech Laser HUD -->
+                    <div class="camera-feed glass-panel" id="cam-4" title="Rear Camera ANPR">
+                        <div class="cam-header">
+                            <span class="cam-label"><i class="ph ph-video-camera"></i> BUS 221 • REAR ANPR</span>
+                            <span class="cam-status recording">REC</span>
+                        </div>
+                        <div class="cam-view anpr-view">
+                            <!-- High tech animated ANPR background -->
+                            <div class="anpr-bg-hud">
+                                <div class="anpr-grid"></div>
+                                <div class="anpr-laser-scan"></div>
+                                <div class="anpr-vehicle-box">
+                                    <div class="anpr-plate">DL 4C AB 1234</div>
+                                    <div class="anpr-plate-sub">HSRP VERIFIED • 96% MATCH</div>
+                                </div>
+                            </div>
+                            <div class="cam-overlay">
+                                <div class="detection-box anpr">
+                                    <span>ANPR: DL 4C AB 1234</span>
+                                    <div class="box-meta">SPEED: 28 km/h • WHITE SEDAN</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cam-footer">
+                            <span>28.6155°N, 77.2120°E • JANPATH</span>
+                            <span class="cam-fps">60 FPS • LOW-LIGHT</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live OSINT Telemetry Ticker Strip -->
+            <div class="osint-ticker-strip">
+                <div class="ticker-label"><div class="ticker-dot"></div> BEL EQUINOX Integrated</div>
+                <div class="ticker-content" id="osint-ticker-content">
+                    <span class="ticker-item">7 new MCD 311 tickets auto-generated</span>
+                    <span class="ticker-item">Rain alert: High waterlogging risk in Central Delhi</span>
+                    <span class="ticker-item">Fleet uptime: 98.2%</span>
+                    <span class="ticker-item">Last data sync: <span id="sync-time">21:07:32</span></span>
+                </div>
+                <div class="ticker-right">AI for Safer, Smarter India 🇮🇳</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- OSINT Data OS Modal / Ingestion Inspector -->
+    <div class="osint-modal-backdrop hidden" id="osint-modal">
+        <div class="osint-modal-card glass-panel">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="ph ph-database"></i>
+                    <span>DRISHTI DATA OS — OPEN INGESTION PIPELINE</span>
+                </div>
+                <button class="icon-btn" id="btn-close-osint-modal"><i class="ph ph-x"></i></button>
+            </div>
+
+            <div class="modal-tabs">
+                <button class="tab-btn active" data-tab="tab-weather"><i class="ph ph-cloud-rain"></i> Live Weather (Open-Meteo)</button>
+                <button class="tab-btn" data-tab="tab-gtfs"><i class="ph ph-bus"></i> DTC GTFS Stream</button>
+                <button class="tab-btn" data-tab="tab-mcd"><i class="ph ph-clipboard-text"></i> MCD 311 Citizen Feed</button>
+                <button class="tab-btn" data-tab="tab-fusion"><i class="ph ph-math-operations"></i> Fusion Math & Discount</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Tab: Live Weather -->
+                <div class="tab-pane active" id="tab-weather">
+                    <div class="pane-grid">
+                        <div class="pane-card">
+                            <div class="card-subtitle">LIVE OPEN-METEO INGESTION</div>
+                            <div class="weather-metrics-grid" id="weather-metrics">
+                                <div class="metric-item">
+                                    <span class="m-lbl">Temperature</span>
+                                    <span class="m-val" id="m-temp">25.0 °C</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="m-lbl">Relative Humidity</span>
+                                    <span class="m-val" id="m-hum">91 %</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="m-lbl">Precipitation</span>
+                                    <span class="m-val" id="m-precip">0.0 mm</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="m-lbl">Wind Speed</span>
+                                    <span class="m-val" id="m-wind">2.7 m/s</span>
+                                </div>
+                            </div>
+                            <p class="pane-explain">
+                                <strong>Why this matters for PS 26124:</strong> High humidity and rain coat bus camera lenses with water droplets. 
+                                Naive models treat all 7 bus images as independent. Our Data OS dynamically calculates the 
+                                <em>environmental correlation coefficient</em> (ρ=0.72) and discounts duplicate confidence!
+                            </p>
+                        </div>
+                        <div class="pane-card">
+                            <div class="card-subtitle">RAW API TELEMETRY (LIVE JSON)</div>
+                            <pre class="json-box" id="weather-raw-json">{ "status": "fetching..." }</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: GTFS Transit -->
+                <div class="tab-pane" id="tab-gtfs">
+                    <div class="card-subtitle">DTC (DELHI TRANSPORT CORPORATION) ARTERIAL ROUTES INGESTED</div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Route</th>
+                                    <th>Origin ↔ Destination</th>
+                                    <th>Key Corridors</th>
+                                    <th>Buses Active</th>
+                                    <th>Avg Speed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge route-badge">402</span></td>
+                                    <td>Okhla Depot ↔ Old Delhi Rly Stn</td>
+                                    <td>Ashram, Pragati Maidan, Ring Rd, ITO</td>
+                                    <td>8</td>
+                                    <td>24 km/h</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge route-badge">119</span></td>
+                                    <td>Mori Gate Terminal ↔ Bajitpur</td>
+                                    <td>Azadpur, GT Karnal Rd, Narela</td>
+                                    <td>6</td>
+                                    <td>31 km/h</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge route-badge">880</span></td>
+                                    <td>Uttam Nagar Terminal ↔ Mori Gate</td>
+                                    <td>Janakpuri, Shadipur, Karol Bagh, Paharganj</td>
+                                    <td>9</td>
+                                    <td>19 km/h (Chokepoint)</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge route-badge">221</span></td>
+                                    <td>Anand Vihar ISBT ↔ Mori Gate</td>
+                                    <td>Laxmi Nagar, Vikas Marg, Red Fort</td>
+                                    <td>7</td>
+                                    <td>22 km/h</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge route-badge">534</span></td>
+                                    <td>Anand Vihar ISBT ↔ Mehrauli Terminal</td>
+                                    <td>Ring Road, Lajpat Nagar, AIIMS, IIT</td>
+                                    <td>11</td>
+                                    <td>27 km/h</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: MCD 311 Citizen Feed -->
+                <div class="tab-pane" id="tab-mcd">
+                    <div class="card-subtitle">MCD 311 OPEN CITIZEN GRIEVANCE CROSS-VALIDATION</div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Ticket ID</th>
+                                    <th>Location</th>
+                                    <th>Reported Hazard</th>
+                                    <th>Citizen Timestamp</th>
+                                    <th>Bus Fleet Cross-Check</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge-tag live-badge">#MCD-2026-9481</span></td>
+                                    <td>Connaught Place Radial 3</td>
+                                    <td>Severe Pothole Cluster (D40)</td>
+                                    <td>Today 08:30 AM</td>
+                                    <td><span class="text-critical">Corroborated by 7 Buses (Depth 4.8cm)</span></td>
+                                    <td><span class="status-pill escalated">ESCALATED TO PWD</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge-tag">#MCD-2026-4102</span></td>
+                                    <td>Outer Ring Road near Lajpat</td>
+                                    <td>Single Pothole Reported</td>
+                                    <td>Yesterday 04:15 PM</td>
+                                    <td><span class="text-low">Single pass (Bus 102) - Low impact</span></td>
+                                    <td><span class="status-pill monitor">SCHEDULED REPAIR</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge-tag">#MCD-2026-7719</span></td>
+                                    <td>AIIMS / IIT Underpass</td>
+                                    <td>Monsoon Waterlogging</td>
+                                    <td>Today 11:20 AM</td>
+                                    <td><span class="text-critical">Submerged lane (18cm depth) confirmed</span></td>
+                                    <td><span class="status-pill critical">PUMP DEPLOYED</span></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge-tag">#MCD-2026-5530</span></td>
+                                    <td>Janpath & Tolstoy Marg</td>
+                                    <td>Damaged Direction Board</td>
+                                    <td>Today 02:00 PM</td>
+                                    <td><span class="text-medium">Bus 119 confirmed 34° tilt angle</span></td>
+                                    <td><span class="status-pill monitor">MAINTENANCE NOTIFIED</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: Fusion Mathematics -->
+                <div class="tab-pane" id="tab-fusion">
+                    <div class="pane-grid">
+                        <div class="pane-card">
+                            <div class="card-subtitle">CORRELATED EVIDENCE DISCOUNT FORMULA</div>
+                            <div class="formula-box">
+                                <div class="math-line">Effective Independent Observations:</div>
+                                <div class="math-eq">N<sub>eff</sub> = N / [ 1 + (N - 1) &times; &rho; ]</div>
+                                <div class="math-vars">
+                                    <span>N = 7 total bus passes</span><br>
+                                    <span>&rho; = 0.72 (shared environmental rain correlation)</span><br>
+                                    <span class="math-result">N<sub>eff</sub> = 7 / [ 1 + (6 &times; 0.72) ] = <strong>4.2 Effective Observations</strong></span>
+                                </div>
+                            </div>
+                            <p class="pane-explain">
+                                This formula prevents our system from artificially inflating confidence when multiple buses pass under the exact same rainstorm. 
+                                Competitor solutions make the rookie mistake of assuming $N=7$ independent passes!
+                            </p>
+                        </div>
+                        <div class="pane-card">
+                            <div class="card-subtitle">PRIORITY FLIP LOGIC (THE 5-SECOND MOMENT)</div>
+                            <div class="comparison-strip">
+                                <div class="comp-box bad">
+                                    <div class="comp-title">NAIVE DETECTOR RANKING</div>
+                                    <div class="comp-item">1. Segment A: 97% confidence &rarr; Priority #1 ❌</div>
+                                    <div class="comp-item">2. Segment B: 84% confidence &rarr; Priority #2 ❌</div>
+                                    <div class="comp-sub">Flawed: Ignores traffic delay (+11m), pedestrian exposure, and multi-bus persistence.</div>
+                                </div>
+                                <div class="comp-box good">
+                                    <div class="comp-title">DRISHTI FUSION RANKING</div>
+                                    <div class="comp-item">1. Segment B: Corroborated + High Impact &rarr; Priority #1 ✅</div>
+                                    <div class="comp-item">2. Segment A: Isolated suburban pass &rarr; Priority #2 ✅</div>
+                                    <div class="comp-sub">Optimal: Prioritizes actual municipal operational harm over camera confidence scores.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1-Click Guided Demo HUD Banner -->
+    <div class="demo-hud-overlay hidden" id="demo-hud">
+        <div class="demo-hud-card glass-panel">
+            <div class="demo-hud-left">
+                <div class="demo-step-badge" id="demo-step-badge">STEP 1 OF 4</div>
+                <div class="demo-hud-title" id="demo-hud-title">SUBURBAN DETECTION (SEGMENT A)</div>
+                <div class="demo-hud-desc" id="demo-hud-desc">
+                    Bus 102 front camera detects isolated pothole on Outer Ring Road (97% raw confidence). Naive ranking marks this #1!
+                </div>
+            </div>
+            <div class="demo-hud-right">
+                <button class="btn-hud-action" id="demo-btn-next">
+                    <span>NEXT STEP</span>
+                    <i class="ph-bold ph-arrow-right"></i>
+                </button>
+                <button class="btn-hud-close" id="demo-btn-exit" title="Exit Demo Mode"><i class="ph ph-x"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equinox Municipal Work Order Modal -->
+    <div class="workorder-modal-backdrop hidden" id="workorder-modal">
+        <div class="workorder-card glass-panel">
+            <div class="wo-header">
+                <div class="wo-title">
+                    <i class="ph-fill ph-check-circle"></i>
+                    <span>BEL EQUINOX — AUTOMATED MUNICIPAL PWD WORK ORDER</span>
+                </div>
+                <button class="icon-btn" id="close-wo-modal"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="wo-body">
+                <div class="wo-meta-grid">
+                    <div class="wo-meta-item">
+                        <span class="wo-lbl">TICKET ID</span>
+                        <span class="wo-val highlight">#PWD-DEL-2026-9481</span>
+                    </div>
+                    <div class="wo-meta-item">
+                        <span class="wo-lbl">CORRIDOR LOCATION</span>
+                        <span class="wo-val">Connaught Place Radial 3 (Lane 2)</span>
+                    </div>
+                    <div class="wo-meta-item">
+                        <span class="wo-lbl">ESCALATION REASON</span>
+                        <span class="wo-val text-critical">7 Bus Passes • +11.4m Delay • School Zone</span>
+                    </div>
+                    <div class="wo-meta-item">
+                        <span class="wo-lbl">MUNICIPAL STATUS</span>
+                        <span class="wo-val text-low">24-Hour Emergency Dispatch</span>
+                    </div>
+                </div>
+
+                <div class="wo-details-box">
+                    <div class="wo-details-title">MUNICIPAL RESOURCE ESTIMATION:</div>
+                    <div class="wo-details-row">
+                        <span>Estimated Crater Depth:</span> <strong>48 mm (LIDAR Calibrated)</strong>
+                    </div>
+                    <div class="wo-details-row">
+                        <span>Pavement Surface Footprint:</span> <strong>1.82 m² (YOLO Spatial Extent)</strong>
+                    </div>
+                    <div class="wo-details-row">
+                        <span>Asphalt / Bitumen Volume:</span> <strong>0.12 m³ (approx. 145 kg Cold Mix)</strong>
+                    </div>
+                    <div class="wo-details-row">
+                        <span>Municipal Crew Dispatched:</span> <strong>PWD Central Division Unit 4 (Truck #DL-01-GA-3321)</strong>
+                    </div>
+                </div>
+
+                <div class="wo-protocol-line">
+                    <i class="ph ph-check-square"></i> Dispatched via standard BEL Equinox NGSI-LD Context Broker REST API (HTTP 200 OK)
+                </div>
+            </div>
+            <div class="wo-footer">
+                <button class="btn-wo-confirm" id="btn-wo-confirm">ACKNOWLEDGE WORK ORDER & RETURN TO MAP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

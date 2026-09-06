@@ -1,0 +1,52 @@
+{
+  "Detector-Only (YOLO max)": {
+    "P@10": 0.615,
+    "P@20": 0.6225,
+    "P@50": 0.583,
+    "NDCG@10": 0.7343,
+    "NDCG@20": 0.7715,
+    "NDCG@50": 0.8256,
+    "Spearman_rho": 0.6906,
+    "False_Escalation@20": 37.75
+  },
+  "Naive Aggregation (Count)": {
+    "P@10": 0.445,
+    "P@20": 0.4825,
+    "P@50": 0.429,
+    "NDCG@10": 0.6387,
+    "NDCG@20": 0.6811,
+    "NDCG@50": 0.7263,
+    "Spearman_rho": 0.5916,
+    "False_Escalation@20": 51.75
+  },
+  "Reliability-Weighted (Indep)": {
+    "P@10": 0.685,
+    "P@20": 0.5825,
+    "P@50": 0.472,
+    "NDCG@10": 0.7613,
+    "NDCG@20": 0.7636,
+    "NDCG@50": 0.7802,
+    "Spearman_rho": 0.5382,
+    "False_Escalation@20": 41.75
+  },
+  "Operational Context Only": {
+    "P@10": 0.905,
+    "P@20": 0.7625,
+    "P@50": 0.535,
+    "NDCG@10": 0.8875,
+    "NDCG@20": 0.8712,
+    "NDCG@50": 0.8467,
+    "Spearman_rho": 0.5884,
+    "False_Escalation@20": 23.75
+  },
+  "Proposed Equinox Fusion": {
+    "P@10": 1.0,
+    "P@20": 1.0,
+    "P@50": 0.908,
+    "NDCG@10": 0.9647,
+    "NDCG@20": 0.9657,
+    "NDCG@50": 0.9659,
+    "Spearman_rho": 0.8978,
+    "False_Escalation@20": 0.0
+  }
+}
