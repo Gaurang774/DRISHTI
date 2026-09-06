@@ -1,8 +1,8 @@
-# CITY EYE: Project Handover & Deployment Guide
+# DRISHTI: Project Handover & Deployment Guide
 
 ## 1. Work Completed (What We Built)
 
-We successfully developed a comprehensive, end-to-end prototype for **CITY EYE** (Mobile Urban Intelligence & Data OS) designed specifically for the SIH presentation. As a "pure software" solution, we focused on architecture, simulated edge-processing, data fusion, and a highly polished UI.
+We successfully developed a comprehensive, end-to-end prototype for **DRISHTI** (Mobile Urban Intelligence & Data OS) designed specifically for the SIH presentation. As a "pure software" solution, we focused on architecture, simulated edge-processing, data fusion, and a highly polished UI.
 
 ### 🧠 Core Architecture & Algorithms
 *   **Defined the 3-Tier Architecture:** Structured the system into Edge Telemetry (Bus YOLO) ➡️ Drishti Fusion Engine ➡️ BEL Equinox ICCC.
@@ -15,7 +15,7 @@ We successfully developed a comprehensive, end-to-end prototype for **CITY EYE**
 *   **CORS & Live Connection:** Configured the backend to seamlessly accept POST requests from the local frontend for the live judge demonstration.
 
 ### 🎨 Frontend Prototype (The ICCC Dashboard)
-*   **Premium "City Eye" UI:** Built a highly professional, dark-mode dashboard using standard HTML/CSS/JS. 
+*   **Premium "DRISHTI" UI:** Built a highly professional, dark-mode dashboard using standard HTML/CSS/JS. 
 *   **Responsive Grid Architecture:** Transitioned from a static floating layout to a robust CSS Flexbox/Grid architecture that scales beautifully across 1080p monitors and 1366x768 laptops without overlapping.
 *   **Interactive "1-Click Judge Demo":** Wired up an interactive sequence that allows judges to trigger a simulated network-wide hazard detection, watch the fusion engine aggregate evidence, and view the final Equinox work-order modal.
 *   **Cinematic Map & Overlays:** Integrated Leaflet.js with custom CSS filters to create a tactical, dark-mode smart-city map.
@@ -29,7 +29,7 @@ The current prototype successfully proves the concept. The future scope focuses 
 1.  **True Multi-Modal AI:** Expanding beyond visual YOLO models to incorporate audio analytics (detecting crashes or honking) and accelerometer data (corroborating potholes via physical bus bounce).
 2.  **Predictive Maintenance:** Using historical hazard data to train models that predict road degradation *before* a pothole forms (e.g., identifying micro-cracking patterns over time).
 3.  **Dynamic Route Optimization:** Feeding choking point and waterlogging data back into DTC navigation systems to automatically reroute buses away from emerging hazards.
-4.  **Citizen Facing App:** Creating a public dashboard where citizens can see real-time road conditions verified by the City Eye network.
+4.  **Citizen Facing App:** Creating a public dashboard where citizens can see real-time road conditions verified by the DRISHTI network.
 
 ---
 

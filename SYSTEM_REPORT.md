@@ -1,4 +1,4 @@
-# DRISHTI (CITY EYE) • Comprehensive System Report
+# DRISHTI • Comprehensive System Report
 **AI-Powered Mobile Urban Intelligence Platform Using Public Transport Fleet**
 *Smart India Hackathon (SIH) — Problem Statement 26124*
 *Organization: Bharat Electronics Limited (BEL)*
@@ -9,7 +9,7 @@
 
 | Field | Description |
 | :--- | :--- |
-| **System Name** | **DRISHTI (दृष्टि)** / **CITY EYE** (Mobile Urban Intelligence & Data OS) |
+| **System Name** | **DRISHTI (दृष्टि)** (Mobile Urban Intelligence & Data OS) |
 | **Problem Statement** | PS 26124: AI-Powered Mobile Urban Intelligence Platform Using Public Transport Fleet |
 | **Sponsoring Body** | Bharat Electronics Limited (BEL) |
 | **Target Integration** | **BEL EQUINOX** Smart City Command & Control Center (ICCC / NGSI-LD) |
@@ -61,6 +61,7 @@ d:\SIH FINAL/
 | :--- | :--- | :--- | :--- |
 | [drishti_api.py](file:///d:/SIH%20FINAL/drishti_api.py) | 7.3 KB | 181 | Zero-dependency HTTP REST gateway simulating NGSI-LD ingestion, bus telemetry, and PWD dispatch. |
 | [equinox_connector.py](file:///d:/SIH%20FINAL/equinox_connector.py) | 6.3 KB | 143 | Dedicated BEL Equinox bridge: OAuth2 tokens, ITMS bus coordinates, NGSI-LD entity publishing, and SOP dispatch. |
+| [fusion_engine.py](file:///d:/SIH%20FINAL/fusion_engine.py) | 3.5 KB | 95 | **[NEW]** The Intelligence Core. Actively fetches live Open-Meteo weather and executes the $N_{eff}$ mathematical correlation discount on edge telemetry. |
 | [fusion_benchmark.py](file:///d:/SIH%20FINAL/fusion_benchmark.py) | 11.9 KB | 303 | Pure Python Monte-Carlo simulation (20 trials x 500 segments) evaluating 5 ranking algorithms. |
 | [benchmark_results.json](file:///d:/SIH%20FINAL/benchmark_results.json) | 1.2 KB | 52 | Stored empirical results from the fusion benchmark ablation study. |
 | [prototype-simple/index.html](file:///d:/SIH%20FINAL/prototype-simple/index.html) | 33.7 KB | 596 | Complete single-page command center: animated map, 4 dashcams, KPI counters, OSINT modal, 1-click judge demo. |
@@ -117,11 +118,16 @@ graph TD
         SOP --> PWD
     end
 
-    subgraph Dashboard["Tier 4: City Eye Command Dashboard"]
+    subgraph Dashboard["Tier 4: DRISHTI Command Dashboard"]
         UI["prototype-simple/ (Leaflet Map + 4 Dashcams + 1-Click Judge Demo)"]
         UI <-->|Fetch / Live Dispatch| Gateway
     end
 ```
+
+### 3.1 Recent Upgrades (The "Build on Top" Architecture)
+The backend has been restructured to separate the API Gateway (`drishti_api.py`) from the Intelligence Core (`fusion_engine.py`). 
+- **Live OSINT Integration**: The engine now actively queries the Open-Meteo API in real-time. If an edge bus detects a hazard, the engine dynamically adjusts the environmental correlation penalty ($\rho$) based on current local humidity and precipitation.
+- **NGSI-LD Alignment**: The `equinox_connector.py` has been updated to parse the exact dictionary structure output by the fusion engine, ensuring full ETSI NGSI-LD compliance during the BEL Equinox dispatch handoff.
 
 ---
 

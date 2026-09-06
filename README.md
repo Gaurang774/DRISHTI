@@ -1,4 +1,4 @@
-# 👁️ DRISHTI (CITY EYE) — Urban Intelligence & Data OS
+# 👁️ DRISHTI — Urban Intelligence & Data OS
 > **Problem Statement 26124:** AI-Powered Mobile Urban Intelligence Platform Using Public Transport Fleet  
 > **Organization:** Bharat Electronics Limited (BEL) • Smart India Hackathon (SIH)
 
@@ -61,7 +61,7 @@ We don't force the city to buy a new proprietary dashboard. We recognized that *
   • Automated PWD Work Order Generation (Bitumen calculation & crew routing)
                 │
                 ▼
- [ TIER 4: CITY EYE COMMAND DASHBOARD ]
+ [ TIER 4: DRISHTI COMMAND DASHBOARD ]
   • Glassmorphic Dark-Mode UI (Leaflet.js)
   • Live Fleet Tracking & Corroboration Heatmaps
 ```
