@@ -1325,3 +1325,45 @@ function getDemoSegments() {
     ];
 }
 
+// ============================================================
+//  TRAFFIC MANAGEMENT — EQUINOX DISPATCH
+// ============================================================
+
+async function dispatchTrafficMarshal(corridorId) {
+    const corridorMap = {
+        'ITO-LN-RR': { corridor: 'Ring Road (ITO → Laxmi Nagar)', severity: 'CRITICAL DELAY' },
+        'AIIMS-RR':  { corridor: 'AIIMS Junction Ring Road',       severity: 'HIGH DELAY - WATERLOGGING' },
+    };
+    const meta = corridorMap[corridorId] || { corridor: corridorId, severity: 'HIGH' };
+
+    const btn = event?.target?.closest('button');
+    if (btn) {
+        btn.innerHTML = '<i class="ph ph-spinner"></i> Dispatching...';
+        btn.disabled = true;
+        setTimeout(() => {
+            btn.innerHTML = '<i class="ph ph-check-circle"></i> Dispatched to EQUINOX ✓';
+            btn.style.background = 'rgba(52,199,89,0.2)';
+            btn.style.borderColor = 'rgba(52,199,89,0.4)';
+            btn.style.color = '#34c759';
+        }, 900);
+    }
+
+    try {
+        const res = await fetch('http://localhost:8080/api/equinox/dispatch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                corridor: meta.corridor,
+                severity: meta.severity,
+                type: 'TrafficMarshalDispatch',
+                bitumen_kg: 0,
+                sop: 'SOP-TRAFFIC-01 (Deploy Traffic Marshal + Road Closure Advisory)',
+                source: 'DRISHTI Traffic Management Alert'
+            })
+        });
+        const data = await res.json();
+        console.log('[DRISHTI] Traffic marshal dispatched to EQUINOX:', data);
+    } catch(e) {
+        console.warn('[DRISHTI] EQUINOX dispatch failed (backend offline):', e);
+    }
+}

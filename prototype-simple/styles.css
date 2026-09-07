@@ -2321,3 +2321,203 @@ h1 {
     height: 6px;
     border-radius: 3px;
 }
+
+/* ============================================================
+   SIDE OVERLAY PANELS (Traffic Alerts + Public Safety)
+   ============================================================ */
+.side-overlay-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 480px;
+    height: 100vh;
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    background: rgba(8, 14, 30, 0.97);
+    border-left: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(20px);
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+.side-overlay-panel.hidden {
+    display: none;
+}
+.overlay-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--text-primary);
+    background: rgba(6, 182, 212, 0.05);
+    flex-shrink: 0;
+}
+.overlay-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* --- Traffic Alert Banners --- */
+.alert-banner {
+    display: flex;
+    gap: 14px;
+    padding: 14px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.critical-alert { background: rgba(255, 45, 85, 0.08); border-color: rgba(255,45,85,0.3); }
+.high-alert     { background: rgba(255, 149, 0, 0.08); border-color: rgba(255,149,0,0.3); }
+.moderate-alert { background: rgba(255, 204, 0, 0.06); border-color: rgba(255,204,0,0.2); }
+
+.ab-icon {
+    font-size: 22px;
+    padding-top: 2px;
+    flex-shrink: 0;
+}
+.critical-alert .ab-icon { color: #ff2d55; }
+.high-alert .ab-icon     { color: #ff9500; }
+.moderate-alert .ab-icon { color: #ffcc00; }
+
+.ab-content { flex: 1; }
+.ab-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+}
+.ab-sub {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+.ab-actions { display: flex; gap: 8px; }
+.ab-btn {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    font-family: var(--font-mono);
+}
+.ab-btn:hover { background: rgba(255,255,255,0.14); transform: translateY(-1px); }
+.equinox-btn { border-color: rgba(6,182,212,0.4); background: rgba(6,182,212,0.1); color: var(--cyan); }
+.equinox-btn:hover { background: rgba(6,182,212,0.2); }
+.monitor-btn { border-color: rgba(255,204,0,0.3); color: #ffcc00; }
+
+/* --- Public Safety Panel --- */
+.safety-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.safety-table { display: flex; flex-direction: column; gap: 4px; }
+.safety-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 0.6fr;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    background: rgba(255,255,255,0.03);
+    color: var(--text-secondary);
+    align-items: center;
+}
+.header-row {
+    font-weight: 700;
+    font-size: 9px;
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+    background: transparent;
+    padding-bottom: 4px;
+}
+.alert-row { background: rgba(255,45,85,0.06); }
+.plate-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--cyan);
+    font-weight: 600;
+}
+.viol-tag {
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    width: fit-content;
+}
+.viol-tag.ok   { background: rgba(52,199,89,0.15);  color: #34c759; }
+.viol-tag.warn { background: rgba(255,45,85,0.15);  color: #ff2d55; }
+
+/* Pedestrian Risk Bars */
+.ped-risk-list { display: flex; flex-direction: column; gap: 12px; }
+.ped-risk-item { }
+.ped-corridor {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+.ped-bar-wrap {
+    height: 6px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 3px;
+    margin-bottom: 4px;
+    overflow: hidden;
+}
+.ped-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s ease;
+}
+.ped-score { font-size: 9px; color: var(--text-secondary); }
+
+/* Greyspot Grid */
+.greyspot-grid { display: flex; flex-direction: column; gap: 8px; }
+.gs-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.gs-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #ff2d55;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px currentColor;
+}
+.gs-info { flex: 1; }
+.gs-name { font-size: 11px; font-weight: 600; color: var(--text-primary); }
+.gs-count { font-size: 9px; color: var(--text-secondary); margin-top: 2px; }
+.gs-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+.red-badge    { background: rgba(255,45,85,0.15);  color: #ff2d55; }
+.orange-badge { background: rgba(255,149,0,0.15);  color: #ff9500; }
+.green-badge  { background: rgba(52,199,89,0.15);  color: #34c759; }
+

@@ -34,7 +34,8 @@
                 <li title="Hazard Hotspots" id="nav-hazards"><i class="ph ph-warning-octagon"></i> <span>Road Intelligence</span></li>
                 <li title="Traffic Analytics" id="nav-analytics" onclick="toggleAnalyticsPanel()"><i class="ph ph-chart-bar"></i> <span>Traffic Analytics</span></li>
                 <li title="5-State Road Belief Model" id="btn-road-belief" onclick="toggleRoadBeliefLayer()" style="cursor:pointer;"><i class="ph ph-brain"></i> <span>Road Belief Map</span></li>
-                <li title="ANPR Mobile Surveillance"><i class="ph ph-scan"></i> <span>Incidents & Safety</span></li>
+                <li title="Traffic Route Delay Alerts" onclick="document.getElementById('traffic-alert-panel').classList.toggle('hidden')" style="cursor:pointer;"><i class="ph ph-traffic-signal"></i> <span>Traffic Alerts</span></li>
+                <li title="Public Safety Intelligence" onclick="document.getElementById('public-safety-panel').classList.toggle('hidden')" style="cursor:pointer;"><i class="ph ph-shield-check"></i> <span>Public Safety</span></li>
                 <li title="MCD 311 Citizen Grievance" id="nav-grievance"><i class="ph ph-clipboard-text"></i> <span>Civic Integration</span></li>
             </ul>
             <div class="sidebar-bottom">
@@ -309,6 +310,162 @@
             </div>
         </main>
     </div>
+
+    <!-- ============================================================ -->
+    <!--  TRAFFIC ROUTE DELAY ALERT PANEL                            -->
+    <!-- ============================================================ -->
+    <div id="traffic-alert-panel" class="side-overlay-panel glass-panel hidden">
+        <div class="overlay-header">
+            <span><i class="ph ph-traffic-signal"></i> TRAFFIC MANAGEMENT ALERTS</span>
+            <button onclick="document.getElementById('traffic-alert-panel').classList.add('hidden')" class="icon-btn"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="overlay-body">
+            <div class="alert-banner critical-alert">
+                <div class="ab-icon"><i class="ph-fill ph-warning-octagon"></i></div>
+                <div class="ab-content">
+                    <div class="ab-title">🔴 CRITICAL DELAY — Ring Road (ITO→Laxmi Nagar)</div>
+                    <div class="ab-sub">+11.4 min avg delay • 1,840 vehicles/hr • Pothole confirmed (N_eff=3.8)</div>
+                    <div class="ab-actions">
+                        <button class="ab-btn equinox-btn" onclick="dispatchTrafficMarshal('ITO-LN-RR')">
+                            <i class="ph ph-siren"></i> Dispatch Traffic Marshal → EQUINOX
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="alert-banner high-alert">
+                <div class="ab-icon"><i class="ph-fill ph-warning"></i></div>
+                <div class="ab-content">
+                    <div class="ab-title">🟠 HIGH DELAY — AIIMS Junction (Ring Road)</div>
+                    <div class="ab-sub">+7.2 min avg delay • Waterlogging (Depth 18cm) • 1 route affected</div>
+                    <div class="ab-actions">
+                        <button class="ab-btn" onclick="dispatchTrafficMarshal('AIIMS-RR')">
+                            <i class="ph ph-siren"></i> Dispatch MCD Pumping Unit
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="alert-banner moderate-alert">
+                <div class="ab-icon"><i class="ph ph-clock"></i></div>
+                <div class="ab-content">
+                    <div class="ab-title">🟡 MODERATE DELAY — Patel Nagar (Shivaji Marg)</div>
+                    <div class="ab-sub">+3.1 min avg delay • Signage defect • Low confidence (1 observation)</div>
+                    <div class="ab-actions">
+                        <button class="ab-btn monitor-btn">
+                            <i class="ph ph-eye"></i> Monitor Only (Await Corroboration)
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div style="padding:16px;font-size:10px;color:var(--text-secondary);border-top:1px solid rgba(255,255,255,0.06);margin-top:8px;line-height:1.6;">
+                <strong style="color:var(--text-primary);">ℹ DRISHTI Dispatch Logic:</strong><br>
+                Only CONFIRMED_DEFECT segments with delay &gt; 5 min trigger automated EQUINOX dispatch.<br>
+                PROBABLE_DEFECT segments are flagged for monitoring and await multi-route corroboration.
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!--  PUBLIC SAFETY PANEL                                        -->
+    <!-- ============================================================ -->
+    <div id="public-safety-panel" class="side-overlay-panel glass-panel hidden">
+        <div class="overlay-header">
+            <span><i class="ph ph-shield-check"></i> PUBLIC SAFETY INTELLIGENCE</span>
+            <button onclick="document.getElementById('public-safety-panel').classList.add('hidden')" class="icon-btn"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="overlay-body">
+
+            <!-- ANPR Violations -->
+            <div class="safety-section-title"><i class="ph ph-scan"></i> ANPR VIOLATION LOG (BUS 221 • REAR CAMERA)</div>
+            <div class="safety-table">
+                <div class="safety-row header-row">
+                    <span>Plate</span><span>Violation</span><span>Location</span><span>Confidence</span>
+                </div>
+                <div class="safety-row">
+                    <span class="plate-tag">DL 4C AB 1234</span><span class="viol-tag ok">HSRP ✓</span><span>Janpath</span><span>96%</span>
+                </div>
+                <div class="safety-row alert-row">
+                    <span class="plate-tag">UP 32 GH 7891</span><span class="viol-tag warn">No HSRP</span><span>ITO Jct</span><span>94%</span>
+                </div>
+                <div class="safety-row alert-row">
+                    <span class="plate-tag">HR 26 BK 4412</span><span class="viol-tag warn">Overloaded</span><span>Ring Rd</span><span>88%</span>
+                </div>
+                <div class="safety-row">
+                    <span class="plate-tag">DL 1C PA 9021</span><span class="viol-tag ok">HSRP ✓</span><span>Connaught Pl</span><span>97%</span>
+                </div>
+            </div>
+
+            <!-- Pedestrian Exposure Risk -->
+            <div class="safety-section-title" style="margin-top:18px;"><i class="ph ph-person-simple-walk"></i> PEDESTRIAN EXPOSURE RISK (FUSION SCORING)</div>
+            <div class="ped-risk-list">
+                <div class="ped-risk-item">
+                    <div class="ped-corridor">Connaught Place Radial 3</div>
+                    <div class="ped-bar-wrap">
+                        <div class="ped-bar" style="width:88%;background:#ff2d55;"></div>
+                    </div>
+                    <div class="ped-score" style="color:#ff2d55;">HIGH (88%) — Pothole + 6.2k pedestrians/day</div>
+                </div>
+                <div class="ped-risk-item">
+                    <div class="ped-corridor">AIIMS Junction — Ring Road</div>
+                    <div class="ped-bar-wrap">
+                        <div class="ped-bar" style="width:72%;background:#ff9500;"></div>
+                    </div>
+                    <div class="ped-score" style="color:#ff9500;">ELEVATED (72%) — Waterlogging + Hospital Zone</div>
+                </div>
+                <div class="ped-risk-item">
+                    <div class="ped-corridor">Vikas Marg (ITO → Laxmi Nagar)</div>
+                    <div class="ped-bar-wrap">
+                        <div class="ped-bar" style="width:41%;background:#ffcc00;"></div>
+                    </div>
+                    <div class="ped-score" style="color:#ffcc00;">MODERATE (41%) — Clear road, medium density</div>
+                </div>
+                <div class="ped-risk-item">
+                    <div class="ped-corridor">Janpath (Connaught → India Gate)</div>
+                    <div class="ped-bar-wrap">
+                        <div class="ped-bar" style="width:22%;background:#34c759;"></div>
+                    </div>
+                    <div class="ped-score" style="color:#34c759;">LOW (22%) — Road clear, low density</div>
+                </div>
+            </div>
+
+            <!-- Accident Greyspot Density -->
+            <div class="safety-section-title" style="margin-top:18px;"><i class="ph ph-map-pin-area"></i> HARD-BRAKING DENSITY (GREYSPOT DETECTION)</div>
+            <div class="greyspot-grid">
+                <div class="gs-item high-gs">
+                    <div class="gs-dot"></div>
+                    <div class="gs-info">
+                        <div class="gs-name">ITO Junction</div>
+                        <div class="gs-count">47 events / 24h</div>
+                    </div>
+                    <div class="gs-badge red-badge">GREYSPOT</div>
+                </div>
+                <div class="gs-item high-gs">
+                    <div class="gs-dot"></div>
+                    <div class="gs-info">
+                        <div class="gs-name">AIIMS Flyover</div>
+                        <div class="gs-count">31 events / 24h</div>
+                    </div>
+                    <div class="gs-badge red-badge">GREYSPOT</div>
+                </div>
+                <div class="gs-item mid-gs">
+                    <div class="gs-dot" style="background:#ff9500;"></div>
+                    <div class="gs-info">
+                        <div class="gs-name">Patel Nagar Signal</div>
+                        <div class="gs-count">18 events / 24h</div>
+                    </div>
+                    <div class="gs-badge orange-badge">MONITOR</div>
+                </div>
+                <div class="gs-item low-gs">
+                    <div class="gs-dot" style="background:#34c759;"></div>
+                    <div class="gs-info">
+                        <div class="gs-name">Janpath Stretch</div>
+                        <div class="gs-count">4 events / 24h</div>
+                    </div>
+                    <div class="gs-badge green-badge">SAFE</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <!-- OSINT Data OS Modal / Ingestion Inspector -->
     <div class="osint-modal-backdrop hidden" id="osint-modal">
