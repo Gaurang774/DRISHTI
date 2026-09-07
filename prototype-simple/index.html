@@ -140,17 +140,19 @@
                 <!-- Left Column -->
                 <div class="left-panel">
                     <div class="live-feed-panel glass-panel">
-                        <div class="panel-title">
+                        <div class="panel-title" style="margin-bottom:0; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:8px;">
                             <i class="ph ph-list-dashes"></i>
-                            <span>LIVE DETECTIONS</span>
+                            <span>LIVE OPERATIONS</span>
                             <div class="live-indicator-wrap"><div class="live-indicator"></div> Live</div>
                         </div>
-                        <div class="feed-filters">
-                            <button class="active">All (28)</button>
-                            <button>Road (12)</button>
-                            <button>Traffic (8)</button>
+                        <div class="feed-filters" style="padding-top:10px; margin-bottom:12px;">
+                            <button class="active" onclick="document.getElementById('alert-feed-list').style.display='block'; document.getElementById('work-orders-list').style.display='none'; this.classList.add('active'); this.nextElementSibling.classList.remove('active');">Detections</button>
+                            <button onclick="document.getElementById('alert-feed-list').style.display='none'; document.getElementById('work-orders-list').style.display='block'; this.classList.add('active'); this.previousElementSibling.classList.remove('active');">Work Orders <span id="wo-count-badge" style="background:#ff2d55; color:#fff; border-radius:4px; padding:0 4px; font-size:9px; margin-left:4px; display:none;">0</span></button>
                         </div>
                         <div class="feed-list" id="alert-feed-list">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div class="feed-list" id="work-orders-list" style="display:none;">
                             <!-- Populated by JS -->
                         </div>
                     </div>
@@ -483,6 +485,7 @@
                 <button class="tab-btn" data-tab="tab-gtfs"><i class="ph ph-bus"></i> DTC GTFS Stream</button>
                 <button class="tab-btn" data-tab="tab-mcd"><i class="ph ph-clipboard-text"></i> MCD 311 Citizen Feed</button>
                 <button class="tab-btn" data-tab="tab-fusion"><i class="ph ph-math-operations"></i> Fusion Math & Discount</button>
+                <button class="tab-btn" data-tab="tab-coverage" onclick="renderCoverageReport()"><i class="ph ph-map-trifold"></i> Coverage Report</button>
             </div>
 
             <div class="modal-body">
@@ -668,6 +671,19 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Tab: Coverage Report -->
+                <div class="tab-pane" id="tab-coverage">
+                    <div class="pane-grid">
+                        <div class="pane-card" style="width: 100%;">
+                            <div class="card-subtitle">5-STATE ROAD BELIEF & COVERAGE MODEL (DRISHTI HYPOTHESIS PROOF)</div>
+                            <div id="coverage-report-container" style="margin-top: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); overflow: hidden;">
+                                <!-- Rendered by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>

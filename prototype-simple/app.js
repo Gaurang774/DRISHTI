@@ -491,6 +491,50 @@ async function initWeatherOSINT() {
     if (rawJsonEl) {
         rawJsonEl.textContent = JSON.stringify({ source: 'Open-Meteo Synoptic Feed', city: city.name, current: fb }, null, 2);
     }
+
+    // Even in fallback, try to get live ρ from backend
+    syncFusionStatusBadge();
+}
+
+// ---- 7b. SYNC LIVE ρ FROM BACKEND FUSION ENGINE (Gap 1 Fix) ----
+async function syncFusionStatusBadge() {
+    const weatherBadge = document.getElementById('weather-discount-badge');
+    const fusionStatusEl = document.getElementById('fusion-engine-status');
+    try {
+        const res = await fetch('http://localhost:8080/api/fusion/status');
+        const data = await res.json();
+        const rho = data.current_environmental_correlation_rho;
+        const weather = data.current_weather;
+
+        if (weatherBadge) {
+            weatherBadge.textContent = `LIVE ρ=${rho.toFixed(2)}`;
+            if (rho >= 0.70) {
+                weatherBadge.style.background = 'rgba(255,45,85,0.2)';
+                weatherBadge.style.color = '#ff2d55';
+                weatherBadge.style.borderColor = 'rgba(255,45,85,0.4)';
+                weatherBadge.title = `High correlation (rain/humidity) — evidence from multiple cameras is discounted`;
+            } else {
+                weatherBadge.style.background = 'rgba(52,199,89,0.15)';
+                weatherBadge.style.color = '#34c759';
+                weatherBadge.style.borderColor = 'rgba(52,199,89,0.3)';
+                weatherBadge.title = `Low correlation (clear conditions) — camera evidence is independent`;
+            }
+        }
+
+        if (fusionStatusEl && weather) {
+            fusionStatusEl.innerHTML = `
+                <div style="font-family:var(--font-mono);font-size:10px;color:#8b949e;padding:8px 0">
+                    <strong style="color:#e6edf3">LIVE FUSION ENGINE STATUS</strong><br>
+                    Temp: ${weather.temperature}°C &nbsp;|&nbsp; Humidity: ${weather.humidity}% &nbsp;|&nbsp;
+                    Precip: ${weather.precipitation}mm<br>
+                    <span style="color:${rho >= 0.70 ? '#ff2d55' : '#34c759'};font-weight:700;">ρ = ${rho.toFixed(2)} (${rho >= 0.70 ? 'HIGH CORRELATION — cameras correlated by weather' : 'LOW CORRELATION — cameras independent'})</span>
+                </div>
+            `;
+        }
+    } catch(e) {
+        // Backend offline — badge stays as Open-Meteo derived value
+        console.log('[DRISHTI] Backend fusion status unavailable, using Open-Meteo derived ρ');
+    }
 }
 
 // ---- 8. CITY SELECTOR ----
@@ -871,8 +915,30 @@ const DEMO_STEPS = [
         badge: 'STEP 4 OF 4 • THE 5-SECOND PRIORITY FLIP & DISPATCH',
         title: 'FUSION OVERRIDE: AUTOMATED PWD WORK ORDER',
         desc: 'DRISHTI flips the priority! Segment B promoted to #1 CRITICAL EMERGENCY, Segment A demoted to MONITOR. Automated work order dispatched via BEL Equinox NGSI-LD Context Broker!',
-        action: () => {
+        action: async () => {
             selectScenario('seg-b');
+            // Gap 3: POST real telemetry to the backend so /api/detections has live data
+            try {
+                await fetch('http://localhost:8080/api/edge/telemetry', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bus_id: 'BUS-402',
+                        hazard_type: 'Pothole',
+                        confidence: 0.89,
+                        lat: 28.6315,
+                        lng: 77.2167,
+                        depth_mm: 48,
+                        segment_id: 'SEG-001',
+                        route_id: 'Route 402'
+                    })
+                });
+                console.log('[DRISHTI] Live telemetry posted to backend — /api/detections now has real data');
+                // Refresh work orders panel
+                fetchAndRenderWorkOrders();
+            } catch(e) {
+                console.log('[DRISHTI] Backend optional in offline mode');
+            }
             setTimeout(() => {
                 showWorkOrderModal();
             }, 600);
@@ -986,6 +1052,12 @@ async function showWorkOrderModal() {
 // Add initJudgeDemo to DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
     initJudgeDemo();
+    // Gap 1: Poll live rho from backend every 60 seconds
+    syncFusionStatusBadge();
+    setInterval(syncFusionStatusBadge, 60000);
+    // Gap 4: Poll live work orders every 30 seconds
+    fetchAndRenderWorkOrders();
+    setInterval(fetchAndRenderWorkOrders, 30000);
 });
 
 // =====================================================
@@ -1367,3 +1439,120 @@ async function dispatchTrafficMarshal(corridorId) {
         console.warn('[DRISHTI] EQUINOX dispatch failed (backend offline):', e);
     }
 }
+
+// ============================================================
+//  GAP 4: LIVE EQUINOX WORK ORDERS (Left Panel Tab)
+// ============================================================
+
+async function fetchAndRenderWorkOrders() {
+    const listEl = document.getElementById('work-orders-list');
+    const badgeEl = document.getElementById('wo-count-badge');
+    if (!listEl) return;
+
+    try {
+        const res = await fetch('http://localhost:8080/api/equinox/workorders');
+        const data = await res.json();
+        const orders = data.work_orders || [];
+
+        if (badgeEl) {
+            badgeEl.textContent = orders.length;
+            badgeEl.style.display = orders.length > 0 ? 'inline-block' : 'none';
+        }
+
+        if (orders.length === 0) {
+            listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: #8b949e; font-size: 11px;">No active work orders.</div>';
+            return;
+        }
+
+        listEl.innerHTML = orders.map(wo => `
+            <div class="feed-item" style="cursor: default;">
+                <div class="feed-header">
+                    <span class="feed-bus" style="color:var(--cyan)">${wo.ticket_id}</span>
+                    <span class="feed-time">${new Date(wo.timestamp).toLocaleTimeString()}</span>
+                </div>
+                <div class="feed-event" style="font-size:11px; margin-top:4px;">${wo.corridor}</div>
+                <div class="feed-meta" style="margin-top:6px;">
+                    <span class="conf-tag feed-critical">${wo.severity}</span>
+                    <span style="color:#8b949e">${wo.ngsi_status}</span>
+                </div>
+                <div style="font-size:9px; color:#6e7681; margin-top:4px; font-family:var(--font-mono)">
+                    Assigned: ${wo.dispatched_to}
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.log('[DRISHTI] Failed to fetch live work orders (offline)');
+    }
+}
+
+// ============================================================
+//  GAP 2: COVERAGE REPORT TAB (OSINT Modal)
+// ============================================================
+
+async function renderCoverageReport() {
+    const container = document.getElementById('coverage-report-container');
+    if (!container) return;
+
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:#8b949e"><i class="ph ph-spinner ph-spin" style="font-size:24px;"></i></div>';
+
+    try {
+        const res = await fetch('http://localhost:8080/api/segments/coverage');
+        const data = await res.json();
+        const segments = data.coverage || [];
+
+        let html = `
+            <table style="width:100%; border-collapse: collapse; font-size:10px; font-family:var(--font-mono); color:#e6edf3;">
+                <thead>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1); color:#8b949e;">
+                        <th style="text-align:left; padding:8px 4px;">Segment / Corridor</th>
+                        <th style="text-align:center; padding:8px 4px;">Coverage</th>
+                        <th style="text-align:center; padding:8px 4px;">Detections</th>
+                        <th style="text-align:right; padding:8px 4px;">Belief State</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        segments.forEach(seg => {
+            let stateColor = '#8b949e';
+            if (seg.state === 'CONFIRMED_DEFECT') stateColor = '#ff2d55';
+            if (seg.state === 'PROBABLE_DEFECT') stateColor = '#ff9500';
+            if (seg.state === 'UNCERTAIN') stateColor = '#ffcc00';
+            if (seg.state === 'PROBABLY_CLEAR') stateColor = '#34c759';
+
+            let barColor = seg.coverage_pct > 15 ? '#34c759' : (seg.coverage_pct > 5 ? '#ffcc00' : '#ff2d55');
+
+            html += `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:10px 4px;">
+                        <div style="font-weight:700">${seg.segment_id}</div>
+                        <div style="color:#8b949e; font-family:var(--font-sans); margin-top:2px;">${seg.name}</div>
+                    </td>
+                    <td style="padding:10px 4px; width:120px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:9px;">
+                            <span>${seg.actual_passes}/${seg.expected_passes} Passes</span>
+                            <span>${seg.coverage_pct.toFixed(1)}%</span>
+                        </div>
+                        <div style="height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+                            <div style="height:100%; width:${Math.min(seg.coverage_pct * 3, 100)}%; background:${barColor}; border-radius:2px;"></div>
+                        </div>
+                    </td>
+                    <td style="padding:10px 4px; text-align:center; font-weight:700; color:${seg.defect_detections > 0 ? '#ff2d55' : '#8b949e'};">
+                        ${seg.defect_detections}
+                    </td>
+                    <td style="padding:10px 4px; text-align:right;">
+                        <span style="color:${stateColor}; border:1px solid ${stateColor}40; background:${stateColor}15; padding:3px 8px; border-radius:4px; font-size:9px;">
+                            ${seg.state.replace('_', ' ')}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #ff2d55; font-size: 11px;">Failed to fetch coverage report (backend offline).</div>';
+    }
+}
+
