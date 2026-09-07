@@ -1,0 +1,378 @@
+[
+  {
+    "cam": "JamCams_00001.09050",
+    "scores": {
+      "counts": {
+        "car": 5,
+        "bus": 2
+      },
+      "pcu": 11.0,
+      "band": "MODERATE",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 7
+    },
+    "api": {
+      "error": "<urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+    }
+  },
+  {
+    "cam": "JamCams_00002.00876",
+    "scores": {
+      "counts": {
+        "car": 1,
+        "bus": 2
+      },
+      "pcu": 7.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 3
+    },
+    "api": {
+      "error": "<urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+    }
+  },
+  {
+    "cam": "JamCams_00001.09702",
+    "scores": {
+      "counts": {
+        "bus": 3,
+        "person": 2,
+        "car": 4
+      },
+      "pcu": 13.0,
+      "band": "MODERATE",
+      "pedestrians": 2,
+      "pedestrian_alert": false,
+      "vehicle_total": 7
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00002.00435",
+    "scores": {
+      "counts": {
+        "car": 3,
+        "traffic light": 1
+      },
+      "pcu": 3.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 3
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00002.00620",
+    "scores": {
+      "counts": {
+        "car": 7
+      },
+      "pcu": 7.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 7
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.04529",
+    "scores": {
+      "counts": {
+        "car": 3
+      },
+      "pcu": 3.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 3
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00002.00325",
+    "scores": {
+      "counts": {
+        "car": 6,
+        "traffic light": 1,
+        "truck": 1
+      },
+      "pcu": 9.0,
+      "band": "MODERATE",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 7
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.04561",
+    "scores": {
+      "counts": {
+        "car": 5,
+        "bus": 1,
+        "person": 1
+      },
+      "pcu": 8.0,
+      "band": "MODERATE",
+      "pedestrians": 1,
+      "pedestrian_alert": false,
+      "vehicle_total": 6
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.04674",
+    "scores": {
+      "counts": {
+        "car": 3,
+        "bus": 1
+      },
+      "pcu": 6.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 4
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.04675",
+    "scores": {
+      "counts": {
+        "car": 4,
+        "bus": 1
+      },
+      "pcu": 7.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 5
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00002.00828",
+    "scores": {
+      "counts": {
+        "truck": 1,
+        "car": 4,
+        "bus": 1
+      },
+      "pcu": 10.0,
+      "band": "MODERATE",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 6
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.06726",
+    "scores": {
+      "counts": {
+        "car": 2,
+        "person": 1,
+        "truck": 1
+      },
+      "pcu": 5.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 1,
+      "pedestrian_alert": false,
+      "vehicle_total": 3
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.07317",
+    "scores": {
+      "counts": {
+        "car": 8,
+        "bus": 2
+      },
+      "pcu": 14.0,
+      "band": "MODERATE",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 10
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.02146",
+    "scores": {
+      "counts": {
+        "car": 1
+      },
+      "pcu": 1.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 1
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.09701",
+    "scores": {
+      "counts": {
+        "car": 4,
+        "bus": 2
+      },
+      "pcu": 10.0,
+      "band": "MODERATE",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 6
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.06704",
+    "scores": {
+      "counts": {
+        "car": 3,
+        "bus": 1,
+        "person": 2
+      },
+      "pcu": 6.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 2,
+      "pedestrian_alert": false,
+      "vehicle_total": 4
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.03507",
+    "scores": {
+      "counts": {
+        "car": 1,
+        "person": 4,
+        "bus": 2
+      },
+      "pcu": 7.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 4,
+      "pedestrian_alert": true,
+      "vehicle_total": 3
+    },
+    "api": {
+      "status": "INGESTED_AND_FUSED",
+      "bandwidth_bytes": 370,
+      "bandwidth_saved_pct": "99.8%",
+      "raw_event": {
+        "event_id": "EVT-0001",
+        "bus_id": "JamCam_00001.03507",
+        "hazard_type": "Pedestrian Hazard",
+        "confidence": 0.0,
+        "lat": 51.5046,
+        "lng": -0.08342,
+        "depth_mm": 0,
+        "payload_bytes": 370,
+        "received_at": "2026-09-07T09:50:50.662788Z"
+      },
+      "fusion_intelligence": {
+        "hazard_type": "Pedestrian Hazard",
+        "raw_confidence": 0.0,
+        "fused_confidence": 0.0,
+        "total_bus_passes": 1,
+        "effective_passes_neff": 1.0,
+        "weather_context": {
+          "temperature": 21.9,
+          "humidity": 61,
+          "precipitation": 0.0
+        },
+        "correlation_rho": 0.35,
+        "priority_level": "LOW (MONITOR)",
+        "escalation_reason": "Isolated Detection",
+        "lat": 51.5046,
+        "lng": -0.08342,
+        "timestamp": "2026-09-07T09:50:51.253247Z",
+        "is_actionable": false
+      },
+      "road_segment_state": null
+    }
+  },
+  {
+    "cam": "JamCams_00001.06580",
+    "scores": {
+      "counts": {
+        "car": 3,
+        "person": 2
+      },
+      "pcu": 3.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 2,
+      "pedestrian_alert": false,
+      "vehicle_total": 3
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00002.00840",
+    "scores": {
+      "counts": {
+        "car": 3,
+        "truck": 2
+      },
+      "pcu": 9.0,
+      "band": "MODERATE",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 5
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  },
+  {
+    "cam": "JamCams_00001.08982",
+    "scores": {
+      "counts": {
+        "car": 3
+      },
+      "pcu": 3.0,
+      "band": "FREE_FLOW",
+      "pedestrians": 0,
+      "pedestrian_alert": false,
+      "vehicle_total": 3
+    },
+    "api": {
+      "error": "HTTP Error 400: Bad Request"
+    }
+  }
+]

@@ -34,118 +34,6 @@ const CITIES = {
     }
 };
 
-// --- CORE SCENARIOS (EVIDENCE FUSION HYPOTHESIS) ---
-const SCENARIOS = {
-    'seg-a': {
-        id: 'seg-a',
-        title: 'Segment A — Outer Ring Road (Suburban)',
-        subtitle: 'High raw confidence, low operational impact',
-        detection: { type: 'Pothole (D40)', confidence: '97%', model: 'YOLOv8-RDD' },
-        observations: { count: 1, buses: ['Bus 102'], timespan: 'Single pass (12m ago)' },
-        context: {
-            traffic: { value: 'Low (240 vph)', color: 'var(--low)' },
-            pedestrians: { value: 'None (Elevated)', color: 'var(--low)' },
-            trend: { value: 'Stable', color: 'var(--text-secondary)' },
-            waterlogging: { value: '0 cm (Dry)', color: 'var(--text-secondary)' },
-            routeDelay: { value: '+0.2 min', color: 'var(--low)' },
-            roadClass: { value: 'Primary Highway', color: 'var(--cyan)' }
-        },
-        priority: { detector: 1, fusion: 2, level: 'low', label: 'MONITOR ONLY' },
-        evidence: [
-            { text: 'Bus 102 front camera detected single pothole (D40) with 97% confidence', type: 'normal' },
-            { text: 'Single observation — no historical corroboration by other fleet units', type: 'normal' },
-            { text: 'GPS Telemetry: High accuracy RTK (±1.8m) • Visibility: Clear daylight', type: 'normal' },
-            { text: 'Traffic Density Matrix: 240 vehicles/hr — low suburban flow', type: 'normal' },
-            { text: 'Cross-Domain Impact: Zero pedestrian exposure, bus transit schedule unaffected', type: 'normal' },
-            { text: 'FUSION DECISION: Downgraded from Rank #1 to MONITOR (Rank #2)', type: 'step-upgrade' }
-        ],
-        correlationWarning: null
-    },
-    'seg-b': {
-        id: 'seg-b',
-        title: 'Segment B — Connaught Place Radial 3',
-        subtitle: 'Lower raw confidence, critical network-wide choking impact',
-        detection: { type: 'Pothole Cluster (D40)', confidence: '84% avg', model: 'YOLOv8-RDD' },
-        observations: { count: 7, buses: ['Bus 402', 'Bus 119', 'Bus 880', 'Bus 221', 'Bus 305', 'Bus 417', 'Bus 662'], timespan: '7 independent passes in 3 hrs' },
-        context: {
-            traffic: { value: 'Extreme (2,100 vph)', color: 'var(--critical)' },
-            pedestrians: { value: 'High (School/Market)', color: 'var(--critical)' },
-            trend: { value: 'Rapidly Worsening', color: 'var(--critical)' },
-            waterlogging: { value: 'Moderate (4.8 cm)', color: 'var(--medium)' },
-            routeDelay: { value: '+11.4 min choke', color: 'var(--critical)' },
-            roadClass: { value: 'Arterial Radial', color: 'var(--critical)' }
-        },
-        priority: { detector: 2, fusion: 1, level: 'critical', label: 'CRITICAL EMERGENCY' },
-        evidence: [
-            { text: '7 independent DTC buses observed road crater across 3-hour window', type: 'normal' },
-            { text: 'Spatial clustering: 100% geometric overlap within 3.2m road bounding box', type: 'normal' },
-            { text: 'ATMOSPHERIC OSINT: Rain & 91% humidity detected by Open-Meteo sensor feed', type: 'step-warning' },
-            { text: 'ENVIRONMENTAL DISCOUNT: Shared rain correlation ρ=0.72 applied -> Effective Passes: 4.2 of 7', type: 'step-warning' },
-            { text: 'MUNICIPAL CROSS-VALIDATION: Corroborates MCD 311 Citizen Grievance #MCD-2026-9481', type: 'step-critical' },
-            { text: 'NETWORK TELEMETRY: Chokepoint causing +11.4 min route delay across 6 bus routes', type: 'step-critical' },
-            { text: 'FUSION DECISION: UPGRADED to CRITICAL #1 — Emergency repair dispatch triggered', type: 'step-upgrade' }
-        ],
-        correlationWarning: 'All 7 buses observed in rain/high humidity. Correlation coefficient ρ=0.72. Correlated evidence discount reduced effective observation weight from 7.0 to 4.2 to avoid artificial confidence inflation.'
-    }
-};
-
-// Additional Map Hotspots (Hazard Points)
-const ROAD_HOTSPOTS = [
-    { id: 'seg-b', lat: 28.6315, lng: 77.2167, type: 'critical', label: 'B', title: 'Connaught Place Radial 3' },
-    { id: 'seg-a', lat: 28.5670, lng: 77.2430, type: 'low', label: 'A', title: 'Outer Ring Road (Lajpat)' },
-    { id: 'water-aiims', lat: 28.5702, lng: 77.2081, type: 'critical', label: 'W', title: 'AIIMS/IIT Flooded Underpass' },
-    { id: 'sign-ito', lat: 28.6280, lng: 77.2410, type: 'medium', label: 'S', title: 'ITO Junction Damaged Sign' },
-    { id: 'crack-vikas', lat: 28.6305, lng: 77.2580, type: 'medium', label: 'C', title: 'Vikas Marg Pavement Cracks' },
-    { id: 'choke-janpath', lat: 28.6180, lng: 77.2170, type: 'low', label: 'T', title: 'Janpath Traffic Chokepoint' }
-];
-
-// MCD 311 Citizen Grievances (OSINT Open Data)
-const MCD_311_TICKETS = [
-    {
-        id: 'MCD-2026-9481',
-        lat: 28.6320,
-        lng: 77.2180,
-        title: 'MCD 311: Pothole Cluster',
-        location: 'Connaught Place Radial 3',
-        reportedBy: 'Citizen via MCD 311 Mobile App',
-        time: 'Today 08:30 AM',
-        busCorroboration: 'Corroborated by 7 DTC Buses (Depth 4.8cm, Volume 0.12m³)',
-        status: 'ESCALATED TO PWD REPAIR DIVISION'
-    },
-    {
-        id: 'MCD-2026-4102',
-        lat: 28.5660,
-        lng: 77.2410,
-        title: 'MCD 311: Road Depression',
-        location: 'Ring Road near Lajpat Nagar',
-        reportedBy: 'Citizen Grievance Portal',
-        time: 'Yesterday 04:15 PM',
-        busCorroboration: 'Single pass (Bus 102) — Stable, no route delay',
-        status: 'SCHEDULED ROUTINE REPAIR'
-    },
-    {
-        id: 'MCD-2026-7719',
-        lat: 28.5710,
-        lng: 77.2070,
-        title: 'MCD 311: Monsoon Waterlogging',
-        location: 'AIIMS / IIT Underpass',
-        reportedBy: 'Traffic Police Helpline Integration',
-        time: 'Today 11:20 AM',
-        busCorroboration: 'Bus 880 confirmed 18cm standing floodwater',
-        status: 'HIGH-CAPACITY PUMP DEPLOYED'
-    },
-    {
-        id: 'MCD-2026-5530',
-        lat: 28.6210,
-        lng: 77.2185,
-        title: 'MCD 311: Broken Gantry Board',
-        location: 'Janpath & Tolstoy Marg',
-        reportedBy: 'Citizen Complaint via Twitter/X',
-        time: 'Today 02:00 PM',
-        busCorroboration: 'Bus 119 optical telemetry: 34° tilt angle',
-        status: 'CIVIC WORK ORDER ISSUED'
-    }
-];
 
 // DTC Bus Arterial Corridors & Real Routes
 const DTC_BUS_ROUTES = [
@@ -218,30 +106,7 @@ const DTC_BUS_ROUTES = [
     }
 ];
 
-// Mock Live Alert Feed items
-const LIVE_ALERTS = [
-    { bus: 'Bus 402', event: 'Pothole (D40) Detected • Ring Rd', conf: '89%', confClass: 'conf-high', type: 'critical', coords: '28.6315°N, 77.2167°E', segId: 'seg-b' },
-    { bus: 'Bus 880', event: 'Monsoon Underpass Submerged (18cm)', conf: '94%', confClass: 'conf-high', type: 'critical', coords: '28.5702°N, 77.2081°E', segId: 'water-aiims' },
-    { bus: 'Bus 119', event: 'Gantry Direction Sign Tilted 34°', conf: '72%', confClass: 'conf-med', type: 'warning', coords: '28.6280°N, 77.2410°E', segId: 'sign-ito' },
-    { bus: 'Bus 221', event: 'ANPR: DL 4C AB 1234 High Speed', conf: '96%', confClass: 'conf-high', type: '', coords: '28.6180°N, 77.2170°E', segId: null },
-    { bus: 'Bus 534', event: 'Road Crack Cluster (D20) • Vikas Marg', conf: '78%', confClass: 'conf-med', type: '', coords: '28.6305°N, 77.2580°E', segId: 'crack-vikas' },
-    { bus: 'Bus 662', event: 'Multi-Bus Corroboration Confirmed (CP)', conf: '92%', confClass: 'conf-high', type: 'critical', coords: '28.6315°N, 77.2167°E', segId: 'seg-b' },
-    { bus: 'MCD 311', event: 'Citizen Complaint Cross-Referenced #9481', conf: 'OSINT', confClass: 'conf-high', type: 'feed-mcd', coords: '28.6320°N, 77.2180°E', segId: 'seg-b' },
-    { bus: 'Bus 781', event: 'Radial Chokepoint Delay +11.4 min', conf: '99%', confClass: 'conf-high', type: 'critical', coords: '28.6315°N, 77.2167°E', segId: 'seg-b' },
-    { bus: 'Bus 402', event: 'Suburban Pothole Single Pass (Monitor)', conf: '97%', confClass: 'conf-high', type: '', coords: '28.5670°N, 77.2430°E', segId: 'seg-a' },
-    { bus: 'Bus 119', event: 'Zebra Crossing Markings Faded (30m)', conf: '69%', confClass: 'conf-med', type: '', coords: '28.6280°N, 77.2410°E', segId: null }
-];
-
-// OSINT Telemetry Ticker Messages
-const TICKER_MESSAGES = [
-    '[OPEN-METEO] DEL_CP: Temp 25.0°C, RelHum 91% -> Rain lens attenuation coefficient ρ=0.72 engaged',
-    '[DTC-GTFS] BUS_402: Lat 28.6315, Lon 77.2167, Spd 24 km/h -> Route: Okhla to Old Delhi Rly',
-    '[MCD-311] TKT-2026-9481: Citizen pothole report cross-checked by 7 buses with 4.8cm calibrated depth',
-    '[EDGE-YOLO] BUS_880: Waterlogging hazard 18cm at AIIMS Underpass -> Triggered emergency municipal pump ticket',
-    '[FUSION-ENGINE] Correlated Evidence Discount applied: Neff = 7 / [1 + (6 * 0.72)] = 4.2 Independent Observations',
-    '[ANPR-STREAM] BUS_221 REAR: Plate DL 4C AB 1234 verified via VAHAN OSINT Database (White Sedan)',
-    '[OSM-GRAPH] Ingested 1,420 arterial road nodes across Central Delhi Ring Road network'
-];
+// Ticker messages are fetched live from /api/ticker — no static mock needed
 
 // Map Layers Groups
 let layerBuses = null;
@@ -304,8 +169,9 @@ function initMap() {
     // Plot Road Trails & Bus Fleet
     renderBusFleet();
 
-    // Plot Hazard Hotspots
+    // Plot Hazard Hotspots and poll for updates
     renderHazards();
+    setInterval(renderHazards, 5000);
 
     // Plot MCD 311 Citizen Grievance Layer (OSINT)
     renderMCDGrievances();
@@ -381,32 +247,53 @@ function startBusAnimation() {
 }
 
 // ---- 5. RENDER ROAD HAZARDS (HOTSPOTS) ----
-function renderHazards() {
+async function renderHazards() {
     layerDamage.clearLayers();
 
-    ROAD_HOTSPOTS.forEach((h) => {
-        const icon = L.divIcon({
-            className: `hotspot-marker hotspot-${h.type}`,
-            html: `
-                <div class="hotspot-ring"></div>
-                <div class="hotspot-inner">${h.label}</div>
-            `,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
+    try {
+        const res = await fetch('http://localhost:8080/api/segments/state');
+        const data = await res.json();
+        
+        // Count confirmed hazards for KPI
+        let criticalCount = 0;
+
+        data.segments.forEach((seg) => {
+            if (seg.state === 'CONFIRMED_DEFECT') {
+                criticalCount++;
+                let markerType = 'critical';
+                if (seg.dominant_hazard === 'Pothole') markerType = 'critical';
+                else if (seg.dominant_hazard === 'Waterlogging') markerType = 'critical';
+                else if (seg.dominant_hazard === 'Signage Defect') markerType = 'medium';
+
+                const icon = L.divIcon({
+                    className: `hotspot-marker hotspot-${markerType}`,
+                    html: `
+                        <div class="hotspot-ring"></div>
+                        <div class="hotspot-inner">${seg.dominant_hazard[0]}</div>
+                    `,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+
+                const marker = L.marker([seg.lat, seg.lng], { icon: icon }).addTo(layerDamage);
+                marker.on('click', () => {
+                    selectScenario(seg.segment_id, seg);
+                });
+
+                marker.bindTooltip(`<strong>${seg.name}</strong><br>Hazard: ${seg.dominant_hazard} (${Math.round(seg.state_confidence * 100)}%)<br>Detections: ${seg.detection_count}`, {
+                    direction: 'top'
+                });
+            }
         });
 
-        const marker = L.marker([h.lat, h.lng], { icon: icon }).addTo(layerDamage);
-        marker.on('click', () => {
-            selectScenario(h.id);
-        });
-
-        marker.bindTooltip(`<strong>${h.title}</strong><br>Click to inspect Evidence Fusion`, {
-            direction: 'top'
-        });
-    });
-
-    const dmgCountEl = document.getElementById('count-dmg');
-    if (dmgCountEl) dmgCountEl.textContent = ROAD_HOTSPOTS.length;
+        const dmgCountEl = document.getElementById('count-dmg');
+        if (dmgCountEl) dmgCountEl.textContent = criticalCount;
+        
+        const kpiCritical = document.getElementById('kpi-critical');
+        if (kpiCritical) kpiCritical.textContent = criticalCount;
+    } catch(e) {
+        console.warn('[DRISHTI] Could not fetch segment state for hazards');
+    }
 }
 
 // ---- 6. RENDER MCD 311 CITIZEN GRIEVANCE (OSINT) ----
@@ -592,68 +479,69 @@ function initLayerFilters() {
     });
 }
 
-// ---- 10. LIVE OSINT TICKER ----
+// ---- 10. LIVE OSINT TICKER (Backend-driven) ----
 function initTicker() {
     const tickerEl = document.getElementById('osint-ticker-content');
     if (!tickerEl) return;
 
-    let msgIndex = 0;
-    setInterval(() => {
-        msgIndex = (msgIndex + 1) % TICKER_MESSAGES.length;
-        tickerEl.innerHTML = `<span class="ticker-item">${TICKER_MESSAGES[msgIndex]}</span>`;
-    }, 4500);
+    async function fetchTicker() {
+        try {
+            const res = await fetch('http://localhost:8080/api/ticker');
+            const data = await res.json();
+            const messages = data.messages || [];
+            if (messages.length === 0) return;
+
+            let idx = 0;
+            // Cycle through live messages
+            tickerEl.innerHTML = `<span class="ticker-item">${messages[idx]}</span>`;
+            setInterval(() => {
+                idx = (idx + 1) % messages.length;
+                tickerEl.innerHTML = `<span class="ticker-item">${messages[idx]}</span>`;
+            }, 4500);
+        } catch (e) {
+            tickerEl.innerHTML = `<span class="ticker-item">[DRISHTI] Awaiting live telemetry — start the backend server to see OSINT feeds</span>`;
+        }
+    }
+
+    fetchTicker();
 }
 
 // ---- 11. LIVE EDGE DETECTION FEED ----
-function initAlertFeed() {
+async function fetchAndRenderAlerts() {
     const feedList = document.getElementById('alert-feed-list');
     if (!feedList) return;
 
-    // Seed initial alerts
-    LIVE_ALERTS.slice(0, 5).forEach(alert => addFeedItem(alert, feedList));
+    try {
+        const res = await fetch('http://localhost:8080/api/detections');
+        const data = await res.json();
+        const detections = data.detections || [];
+        
+        if (detections.length === 0) {
+            feedList.innerHTML = '<div style="padding: 20px; text-align: center; color: #8b949e; font-size: 11px;">Waiting for edge telemetry...</div>';
+            return;
+        }
 
-    // Push new alert every 3.5 seconds
-    let alertIndex = 5;
-    setInterval(() => {
-        const item = LIVE_ALERTS[alertIndex % LIVE_ALERTS.length];
-        addFeedItem(item, feedList);
-        alertIndex++;
-    }, 3500);
+        feedList.innerHTML = detections.slice().reverse().slice(0, 25).map(det => `
+            <div class="feed-item ${det.confidence > 0.85 ? 'feed-critical' : ''}" style="cursor: pointer;" onclick="map.setView([${det.lat}, ${det.lng}], 16)">
+                <div class="feed-header">
+                    <span class="feed-bus">${det.bus_id}</span>
+                    <span class="feed-time">${new Date(det.timestamp).toLocaleTimeString()}</span>
+                </div>
+                <div class="feed-event">${det.hazard_type} Detected</div>
+                <div class="feed-meta">
+                    <span class="conf-tag ${det.confidence > 0.85 ? 'conf-high' : 'conf-med'}">${(det.confidence * 100).toFixed(1)}%</span>
+                    <span>${det.lat.toFixed(4)}°N, ${det.lng.toFixed(4)}°E</span>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.log('[DRISHTI] Failed to fetch live alerts (offline)');
+    }
 }
 
-function addFeedItem(item, container) {
-    const el = document.createElement('div');
-    el.className = `feed-item ${item.type === 'critical' ? 'feed-critical' : ''} ${item.type === 'feed-mcd' ? 'feed-mcd' : ''}`;
-    el.innerHTML = `
-        <div class="feed-header">
-            <span class="feed-bus">${item.bus}</span>
-            <span class="feed-time">Just now</span>
-        </div>
-        <div class="feed-event">${item.event}</div>
-        <div class="feed-meta">
-            <span class="conf-tag ${item.confClass}">${item.conf}</span>
-            <span>${item.coords}</span>
-        </div>
-    `;
-
-    el.addEventListener('click', () => {
-        if (item.segId && SCENARIOS[item.segId]) {
-            selectScenario(item.segId);
-        } else {
-            // Pan to coordinates
-            const parts = item.coords.split(',');
-            if (parts.length === 2) {
-                const lat = parseFloat(parts[0]);
-                const lng = parseFloat(parts[1]);
-                map.setView([lat, lng], 15);
-            }
-        }
-    });
-
-    container.prepend(el);
-    while (container.children.length > 25) {
-        container.removeChild(container.lastChild);
-    }
+function initAlertFeed() {
+    fetchAndRenderAlerts();
+    setInterval(fetchAndRenderAlerts, 3000);
 }
 
 // ---- 12. SEGMENT INTELLIGENCE (RIGHT PANEL) ----
@@ -665,113 +553,72 @@ function initIntelPanel() {
             document.getElementById('intel-empty').classList.remove('hidden');
         });
     }
-
-    // Automatically select Segment B on start after 1.5s to impress user
-    setTimeout(() => {
-        selectScenario('seg-b');
-    }, 1200);
 }
 
-function selectScenario(id) {
-    const scenario = SCENARIOS[id];
+function selectScenario(id, segmentData) {
     const emptyEl = document.getElementById('intel-empty');
     const contentEl = document.getElementById('intel-content');
 
-    if (!scenario) {
-        // Generic hotspot click
-        const hotspot = ROAD_HOTSPOTS.find(h => h.id === id);
-        if (hotspot) {
-            emptyEl.classList.add('hidden');
-            contentEl.classList.remove('hidden');
-            contentEl.innerHTML = `
-                <div class="seg-title-card">
-                    <div class="seg-name">${hotspot.title}</div>
-                    <div class="seg-sub">Urban Hazard Hotspot • Lat: ${hotspot.lat}, Lon: ${hotspot.lng}</div>
-                </div>
-                <div class="p-box fusion" style="text-align: left; padding: 0.75rem;">
-                    <div class="p-label">FUSION STATUS</div>
-                    <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-bright); margin-top: 0.3rem;">
-                        Multi-bus surveillance tracking active. Edge detections corroborated via spatial clustering.
-                    </div>
-                </div>
-            `;
-            map.setView([hotspot.lat, hotspot.lng], 15);
-        }
-        return;
-    }
+    if (!segmentData) return;
 
     emptyEl.classList.add('hidden');
     contentEl.classList.remove('hidden');
 
-    const p = scenario.priority;
-    const ctx = scenario.context;
+    const priorityLabel = segmentData.detection_history.length > 5 ? 'CRITICAL EMERGENCY' : 'MONITOR ONLY';
+    const priorityColor = segmentData.detection_history.length > 5 ? 'critical' : 'warning';
 
     contentEl.innerHTML = `
         <div class="seg-title-card">
-            <div class="seg-name">${scenario.title}</div>
-            <div class="seg-sub">${scenario.subtitle}</div>
+            <div class="seg-name">${segmentData.name}</div>
+            <div class="seg-sub">${segmentData.corridor}</div>
         </div>
 
         <!-- The 5-Second Moment: Priority Banner -->
         <div class="priority-banner">
             <div class="p-box detector">
-                <div class="p-label">Detector Only</div>
-                <div class="p-rank">#${p.detector}</div>
-                <div class="p-desc">Raw YOLO Confidence (${scenario.detection.confidence})</div>
+                <div class="p-label">Detector Confidence</div>
+                <div class="p-rank">${Math.round(segmentData.state_confidence * 100)}%</div>
+                <div class="p-desc">Aggregated over ${segmentData.detection_count} passes</div>
             </div>
-            <div class="p-box fusion ${p.level}">
-                <div class="p-label">DRISHTI Fusion</div>
-                <div class="p-rank">#${p.fusion}</div>
-                <div class="p-desc">Evidence + Delay + Exposure</div>
+            <div class="p-box fusion ${priorityColor}">
+                <div class="p-label">DRISHTI Fusion Priority</div>
+                <div class="p-rank" style="font-size:1.1rem; line-height:36px; padding-top:4px;">${priorityLabel}</div>
+                <div class="p-desc">${segmentData.dominant_hazard}</div>
             </div>
         </div>
-
-        ${scenario.correlationWarning ? `
-            <div class="correlation-box">
-                <i class="ph-fill ph-warning"></i>
-                <span>${scenario.correlationWarning}</span>
-            </div>
-        ` : ''}
 
         <!-- Operational Context Matrix -->
         <div>
             <div class="intel-section-title"><i class="ph ph-sliders"></i> OPERATIONAL CONTEXT</div>
             <div class="context-grid">
                 <div class="ctx-item">
-                    <span class="ctx-label">Traffic Density</span>
-                    <span class="ctx-val" style="color:${ctx.traffic.color}">${ctx.traffic.value}</span>
+                    <span class="ctx-label">Total Routes Affected</span>
+                    <span class="ctx-val" style="color:var(--text-bright)">${segmentData.routes_that_detected.length} Routes</span>
                 </div>
                 <div class="ctx-item">
-                    <span class="ctx-label">Pedestrian Risk</span>
-                    <span class="ctx-val" style="color:${ctx.pedestrians.color}">${ctx.pedestrians.value}</span>
-                </div>
-                <div class="ctx-item">
-                    <span class="ctx-label">Route Delay</span>
-                    <span class="ctx-val" style="color:${ctx.routeDelay.color}">${ctx.routeDelay.value}</span>
-                </div>
-                <div class="ctx-item">
-                    <span class="ctx-label">Waterlogging</span>
-                    <span class="ctx-val" style="color:${ctx.waterlogging.color}">${ctx.waterlogging.value}</span>
+                    <span class="ctx-label">Corroborating Passes</span>
+                    <span class="ctx-val" style="color:var(--text-bright)">${segmentData.detection_history.length}</span>
                 </div>
             </div>
         </div>
 
         <!-- Evidence Reasoning Chain -->
-        <div>
+        <div style="margin-top: 15px;">
             <div class="intel-section-title"><i class="ph ph-git-commit"></i> AUDITABLE EVIDENCE CHAIN</div>
-            <div class="evidence-chain">
-                ${scenario.evidence.map(step => `
-                    <div class="evidence-step ${step.type}">${step.text}</div>
+            <div class="evidence-chain" style="max-height: 250px; overflow-y: auto;">
+                ${segmentData.detection_history.slice().reverse().map(h => `
+                    <div class="evidence-step normal" style="font-size:11px; padding: 6px;">
+                        [${new Date(h.timestamp).toLocaleTimeString()}] ${h.route} detected ${h.hazard} (N_eff = ${h.n_eff.toFixed(2)})
+                    </div>
                 `).join('')}
+                <div class="evidence-step step-upgrade" style="font-size:11px; padding: 6px; margin-top:8px;">
+                    FUSION DECISION: ${segmentData.state} • ${segmentData.dominant_hazard}
+                </div>
             </div>
         </div>
     `;
 
-    // Center map on this segment
-    const targetHotspot = ROAD_HOTSPOTS.find(h => h.id === id);
-    if (targetHotspot) {
-        map.setView([targetHotspot.lat, targetHotspot.lng], 15);
-    }
+    map.setView([segmentData.lat, segmentData.lng], 16);
 }
 
 // ---- 13. SHOW MCD 311 MODAL / INTEL ----
@@ -1290,9 +1137,13 @@ async function renderRoadBeliefLayer() {
         const data = await res.json();
         segments = data.segments || [];
     } catch(e) {
-        console.warn('[DRISHTI] Could not fetch segment states from API, using demo data.', e);
-        // Demo fallback so the layer still works without the backend running
-        segments = getDemoSegments();
+        console.warn('[DRISHTI] Backend offline — road belief layer requires a running backend server (python drishti_api.py).', e);
+        // Show an offline notice on the map instead of fabricated data
+        const offlineNotice = L.popup()
+            .setLatLng(CITIES[currentCity].center)
+            .setContent('<div style="font-family:monospace;font-size:12px;color:#ff2d55;">⚠ Backend offline<br><small>Run <code>python drishti_api.py</code> to load live segment data.</small></div>')
+            .openOn(map);
+        return;
     }
 
     const group = L.layerGroup();
@@ -1384,18 +1235,8 @@ function hideLegend(id) {
     if (el) el.style.display = 'none';
 }
 
-function getDemoSegments() {
-    // Fallback demo data matching the 7 segments in road_segment_db.py
-    return [
-        { segment_id:'SEG-001', name:'Connaught Place Radial 3', lat:28.6315, lng:77.2167, routes:['Route 402','Route 119'], expected_daily_passes:42, actual_passes:2, usable_observations:2, detection_count:2, null_observations:0, state:'CONFIRMED_DEFECT', state_confidence:0.97, dominant_hazard:'Pothole', last_updated:'2026-09-07T06:30:00Z' },
-        { segment_id:'SEG-002', name:'Vikas Marg (ITO to Laxmi Nagar)', lat:28.6280, lng:77.2750, routes:['Route 221','Route 534'], expected_daily_passes:28, actual_passes:5, usable_observations:5, detection_count:0, null_observations:5, state:'PROBABLY_CLEAR', state_confidence:0.90, dominant_hazard:null, last_updated:'2026-09-07T06:00:00Z' },
-        { segment_id:'SEG-003', name:'AIIMS Junction - Ring Road', lat:28.5680, lng:77.2090, routes:['Route 880'], expected_daily_passes:12, actual_passes:1, usable_observations:1, detection_count:1, null_observations:0, state:'PROBABLE_DEFECT', state_confidence:0.60, dominant_hazard:'Waterlogging', last_updated:'2026-09-07T07:15:00Z' },
-        { segment_id:'SEG-004', name:'Naraina Industrial Area Road', lat:28.6194, lng:77.1295, routes:['Route 781'], expected_daily_passes:8, actual_passes:0, usable_observations:0, detection_count:0, null_observations:0, state:'UNOBSERVED', state_confidence:0.0, dominant_hazard:null, last_updated:null },
-        { segment_id:'SEG-005', name:'Outer Ring Road (Dhaula Kuan)', lat:28.5952, lng:77.1673, routes:[], expected_daily_passes:0, actual_passes:0, usable_observations:0, detection_count:0, null_observations:0, state:'UNOBSERVED', state_confidence:0.0, dominant_hazard:null, last_updated:null },
-        { segment_id:'SEG-006', name:'Janpath (Connaught Place)', lat:28.6139, lng:77.2179, routes:['Route 402','Route 119','Route 221','Route 534'], expected_daily_passes:55, actual_passes:6, usable_observations:6, detection_count:0, null_observations:6, state:'PROBABLY_CLEAR', state_confidence:0.95, dominant_hazard:null, last_updated:'2026-09-07T08:00:00Z' },
-        { segment_id:'SEG-007', name:'Shivaji Marg (Patel Nagar)', lat:28.6394, lng:77.1635, routes:['Route 119'], expected_daily_passes:14, actual_passes:1, usable_observations:1, detection_count:1, null_observations:0, state:'PROBABLE_DEFECT', state_confidence:0.60, dominant_hazard:'Signage Defect', last_updated:'2026-09-07T08:00:00Z' },
-    ];
-}
+// getDemoSegments() removed — all segment data must come from /api/segments/state.
+// Start the backend server (python drishti_api.py) to populate the road belief layer.
 
 // ============================================================
 //  TRAFFIC MANAGEMENT — EQUINOX DISPATCH

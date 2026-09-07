@@ -14,6 +14,7 @@ Run with: python drishti_api.py
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import json
 import urllib.parse
+import os
 from datetime import datetime
 from fusion_engine import FusionEngine
 from road_segment_db import RoadSegmentDB
@@ -105,7 +106,43 @@ class DrishtiAPIHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
-        if path == "/api/health" or path == "/":
+        # 0. Serve Prototype Dashboard Frontend
+        if path == "/" or path == "/dashboard" or path == "/index.html":
+            index_file = os.path.join(os.path.dirname(__file__), "prototype-simple", "index.html")
+            if os.path.exists(index_file):
+                self._set_headers(200, "text/html; charset=utf-8")
+                with open(index_file, "rb") as f:
+                    self.wfile.write(f.read())
+                return
+
+        # Serve static assets (app.js, styles.css, etc.)
+        static_exts = {
+            ".js": "application/javascript",
+            ".css": "text/css",
+            ".png": "image/png",
+            ".svg": "image/svg+xml",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".ico": "image/x-icon",
+            ".woff": "font/woff",
+            ".woff2": "font/woff2",
+            ".ttf": "font/ttf"
+        }
+        for ext, mime in static_exts.items():
+            if path.endswith(ext):
+                rel_path = path.lstrip("/")
+                candidates = [
+                    os.path.join(os.path.dirname(__file__), "prototype-simple", rel_path),
+                    os.path.join(os.path.dirname(__file__), rel_path)
+                ]
+                for c in candidates:
+                    if os.path.exists(c) and os.path.isfile(c):
+                        self._set_headers(200, mime)
+                        with open(c, "rb") as f:
+                            self.wfile.write(f.read())
+                        return
+
+        if path == "/api/health":
             response = {
                 "system": "DRISHTI Urban Data OS API Gateway",
                 "version": "1.2.0-bel-equinox",

@@ -1,302 +1,409 @@
 """
-================================================================================
-DRISHTI / PS 26124: CORRELATED EVIDENCE FUSION BENCHMARK (E1/E2)
-Bharat Electronics Limited (BEL) — Smart City Urban Intelligence Platform
-Pure Python Standard Library (Zero External Dependencies)
-================================================================================
+DRISHTI / PS 26124 - CORRELATED EVIDENCE FUSION BENCHMARK (honest rebuild)
+Smart India Hackathon - Bharat Electronics Limited
+
+WHAT THIS TESTS
+    H1: Under repeated, noisy, environmentally-CORRELATED observations from a
+        public bus fleet, does discounting correlated evidence recover the
+        municipal priority ranking better than assuming observations are
+        independent?
+
+WHY THE PREVIOUS BENCHMARK WAS INVALID
+    The earlier version generated ground truth as
+        urgency = 0.40*severity + 0.25*traffic + 0.20*delay + 0.15*pedestrian
+    and then handed traffic/delay/pedestrian (60% of the answer key) to the
+    proposed method NOISE-FREE, while baselines saw only noisy camera
+    confidence. It also read the true correlation rho from the ground-truth
+    dict. Result: P@10 = 1.000, which measured the leak, not the method.
+
+WHAT IS FIXED HERE
+    1. NO ORACLE. Every method reads from the same ObservableSegment - noisy
+       estimates only. Ground truth is never visible to any method.
+    2. rho is ESTIMATED from observable weather, not read from ground truth.
+    3. Methods 3 and 5 differ by EXACTLY ONE THING - the correlation discount -
+       so the measured gap is attributable to it.
+    4. Policy weights are perturbed per trial, so no method can be tuned to the
+       exact ground-truth formula.
+    5. Paired per-trial reporting (mean delta, 95% CI, win rate), because a
+       single averaged number hides variance.
+
+Pure Python standard library. No external dependencies.
 """
 
 import math
 import random
 import statistics
-import json
 
-def set_seed(seed=42):
-    random.seed(seed)
 
-def spearman_rank_correlation(x, y):
-    """Calculates Spearman rank correlation coefficient without scipy."""
+# ---------------------------------------------------------------------------
+# Experimental parameters - kept configurable so results are not circular.
+# ---------------------------------------------------------------------------
+
+class Config:
+    NUM_SEGMENTS = 500
+    MAX_PASSES = 8
+    NUM_TRIALS = 100
+    TOP_FRACTION = 0.15          # top 15% of segments = "genuinely urgent"
+
+    # Declared municipal policy (analogous to an IRC / PWD SOP weighting).
+    # Fixed and published UP FRONT - not fitted to our own output.
+    POLICY = {"severity": 0.40, "traffic": 0.25, "delay": 0.20, "pedestrian": 0.15}
+    POLICY_JITTER = 0.05         # per-trial perturbation of the true policy
+
+    # Sensor noise model
+    RAIN_PROBABILITY = 0.25
+    SHARED_ENV_NOISE_SD = 0.20   # correlated component (same rain, same optics)
+    INDIV_NOISE_SD = 0.12        # independent per-camera component
+
+    # How well each contextual signal can actually be measured in the field.
+    TRAFFIC_OBS_SD = 0.18        # bus-camera vehicle counting is rough
+    DELAY_OBS_SD = 0.06          # GTFS AVL delay is fairly reliable
+    PEDESTRIAN_OBS_SD = 0.15     # pedestrian exposure is hard to estimate
+
+    # Correlation estimated from observable weather (NOT ground truth).
+    RHO_WET = 0.72
+    RHO_DRY = 0.15
+
+    # FL model-correlation parameters.
+    # When every bus runs the SAME weights, model rho is high (same blind spots).
+    # After FL training, local fine-tuning diverges weights per corridor, lowering rho.
+    RHO_MODEL_SAME   = 0.80   # no FL: identical weights across all buses
+    RHO_MODEL_FL_MIN = 0.10   # fully diverged FL weights (best case)
+    FL_ROUNDS        = 5      # simulated FL aggregation rounds per shift
+
+    SATURATION_K = 1.2           # evidence saturation constant in the fusion term
+
+
+# ---------------------------------------------------------------------------
+# Metrics
+# ---------------------------------------------------------------------------
+
+def spearman(x, y):
+    """Spearman rank correlation with average ranks for ties (no scipy)."""
     n = len(x)
     if n == 0:
         return 0.0
 
-    def get_ranks(seq):
-        indexed = sorted(enumerate(seq), key=lambda item: item[1])
-        ranks = [0] * n
+    def ranks(seq):
+        order = sorted(range(n), key=lambda i: seq[i])
+        out = [0.0] * n
         i = 0
         while i < n:
             j = i
-            while j < n - 1 and indexed[j][1] == indexed[j + 1][1]:
+            while j < n - 1 and seq[order[j]] == seq[order[j + 1]]:
                 j += 1
-            avg_rank = (i + j + 2) / 2.0
+            avg = (i + j + 2) / 2.0
             for k in range(i, j + 1):
-                ranks[indexed[k][0]] = avg_rank
+                out[order[k]] = avg
             i = j + 1
-        return ranks
+        return out
 
-    rx = get_ranks(x)
-    ry = get_ranks(y)
+    rx, ry = ranks(x), ranks(y)
+    mx, my = statistics.mean(rx), statistics.mean(ry)
+    num = sum((rx[i] - mx) * (ry[i] - my) for i in range(n))
+    dx = sum((rx[i] - mx) ** 2 for i in range(n))
+    dy = sum((ry[i] - my) ** 2 for i in range(n))
+    return num / math.sqrt(dx * dy) if dx and dy else 0.0
 
-    mean_rx = statistics.mean(rx)
-    mean_ry = statistics.mean(ry)
 
-    num = sum((rx[i] - mean_rx) * (ry[i] - mean_ry) for i in range(n))
-    den_x = sum((rx[i] - mean_rx) ** 2 for i in range(n))
-    den_y = sum((ry[i] - mean_ry) ** 2 for i in range(n))
+def evaluate(true_urgency, predicted, ks=(10, 20, 50)):
+    """Rank the segments by `predicted`, score against `true_urgency`."""
+    n = len(true_urgency)
+    gt_order = sorted(range(n), key=lambda i: true_urgency[i], reverse=True)
+    urgent = set(gt_order[:int(Config.TOP_FRACTION * n)])
+    pred_order = sorted(range(n), key=lambda i: predicted[i], reverse=True)
 
-    if den_x == 0 or den_y == 0:
-        return 0.0
-    return num / math.sqrt(den_x * den_y)
+    res = {}
+    for k in ks:
+        res[f"P@{k}"] = len(set(pred_order[:k]) & urgent) / float(k)
+        idcg = sum(true_urgency[gt_order[i]] / math.log2(i + 2) for i in range(k))
+        dcg = sum(true_urgency[pred_order[i]] / math.log2(i + 2) for i in range(k))
+        res[f"NDCG@{k}"] = dcg / idcg if idcg > 0 else 0.0
 
-class UrbanSimulationBenchmark:
-    def __init__(self, num_segments=500, max_buses_per_segment=8):
-        self.num_segments = num_segments
-        self.max_buses = max_buses_per_segment
-        self.segments = []
+    res["Spearman"] = spearman(true_urgency, predicted)
+    res["FalseEsc@20"] = 100.0 * sum(1 for i in pred_order[:20] if i not in urgent) / 20.0
+    return res
 
-    def generate_ground_truth_environment(self):
-        self.segments = []
-        for i in range(self.num_segments):
-            # Category selection
-            r = random.random()
-            if r < 0.15:
-                cat = 'critical'
-                true_severity = random.uniform(0.75, 1.0)
-            elif r < 0.50:
-                cat = 'moderate'
-                true_severity = random.uniform(0.40, 0.74)
-            elif r < 0.85:
-                cat = 'minor'
-                true_severity = random.uniform(0.15, 0.39)
+
+# ---------------------------------------------------------------------------
+# World simulation - ground truth is generated here and NEVER exposed to methods
+# ---------------------------------------------------------------------------
+
+def make_world(policy):
+    """Generate segments with hidden truth + the noisy observations of it."""
+    segments = []
+    for i in range(Config.NUM_SEGMENTS):
+        r = random.random()
+        if r < 0.15:
+            severity = random.uniform(0.75, 1.0)
+        elif r < 0.50:
+            severity = random.uniform(0.40, 0.74)
+        elif r < 0.85:
+            severity = random.uniform(0.15, 0.39)
+        else:
+            severity = 0.0
+
+        traffic = random.uniform(100, 2500)
+        delay = min(random.expovariate(1 / 2.5 if severity > 0.4 else 1 / 0.5), 15.0)
+        pedestrian = random.betavariate(2, 5)
+
+        # --- HIDDEN ground truth: the municipal priority we must recover ---
+        true_urgency = (policy["severity"] * severity
+                        + policy["traffic"] * (traffic / 2500.0)
+                        + policy["delay"] * (delay / 15.0)
+                        + policy["pedestrian"] * pedestrian)
+
+        is_rain = random.random() < Config.RAIN_PROBABILITY
+
+        # --- Camera observations: correlated error under shared weather ---
+        shared = random.gauss(0, Config.SHARED_ENV_NOISE_SD) if is_rain else 0.0
+        passes = random.randint(1, Config.MAX_PASSES)
+        observations = []
+        for _ in range(passes):
+            indiv = random.gauss(0, Config.INDIV_NOISE_SD)
+            if severity == 0.0 and is_rain:
+                # wet-road reflection mimics a pothole for EVERY passing bus
+                conf = min(0.98, max(0.0, 0.65 + 0.5 * shared + indiv))
+            elif severity > 0:
+                conf = min(0.99, max(0.10, severity + (shared if is_rain else 0.0) + indiv))
             else:
-                cat = 'clean'
-                true_severity = 0.0
-
-            traffic_density = random.uniform(100, 2500)
-            base_delay = random.expovariate(1.0 / 2.5) if true_severity > 0.4 else random.expovariate(1.0 / 0.5)
-            route_delay = min(base_delay, 15.0)
-            pedestrian_exposure = random.betavariate(2, 5)
-
-            # True Municipal Urgency Score
-            true_urgency = (
-                0.40 * true_severity +
-                0.25 * (traffic_density / 2500.0) +
-                0.20 * (route_delay / 15.0) +
-                0.15 * pedestrian_exposure
-            )
-
-            # Weather correlation (25% rain downpour)
-            is_rain = random.random() < 0.25
-            env_correlation_rho = 0.72 if is_rain else 0.15
-
-            self.segments.append({
-                'id': i,
-                'category': cat,
-                'true_severity': true_severity,
-                'traffic_density': traffic_density,
-                'route_delay': route_delay,
-                'pedestrian_exposure': pedestrian_exposure,
-                'true_urgency': true_urgency,
-                'is_rain': is_rain,
-                'rho': env_correlation_rho,
-                'observations': []
+                conf = min(0.40, max(0.0, 0.5 * indiv))
+            observations.append({
+                "raw_conf": conf,
+                "camera_quality": random.uniform(0.70, 0.98),
+                "gps_accuracy": random.uniform(0.50, 0.95),
             })
 
-    def simulate_fleet_observations(self):
-        for seg in self.segments:
-            num_passes = random.randint(1, self.max_buses)
-            shared_env_noise = random.gauss(0, 0.20) if seg['is_rain'] else 0.0
+        def noisy(value, sd):
+            return min(1.0, max(0.0, value + random.gauss(0, sd)))
 
-            observations = []
-            for b in range(num_passes):
-                camera_quality = random.uniform(0.70, 0.98)
-                gps_accuracy = random.uniform(0.50, 0.95)
-                indiv_noise = random.gauss(0, 0.12)
+        # FL weight divergence: after FL training rounds buses have locally
+        # fine-tuned weights. More rounds -> more divergence -> lower rho_model.
+        # Simulated as a Beta draw scaled by FL_ROUNDS (higher = more diverged).
+        fl_divergence = min(1.0, random.betavariate(2, 3)
+                            * Config.FL_ROUNDS / 10.0)
 
-                if seg['true_severity'] == 0.0 and seg['is_rain']:
-                    # Puddle reflection false positive
-                    detected_conf = max(0.0, min(0.98, 0.65 + shared_env_noise * 0.5 + indiv_noise))
-                elif seg['true_severity'] > 0:
-                    base_val = seg['true_severity'] + (shared_env_noise if seg['is_rain'] else 0.0) + indiv_noise
-                    detected_conf = max(0.10, min(0.99, base_val))
-                else:
-                    detected_conf = max(0.0, min(0.40, indiv_noise * 0.5))
+        segments.append({
+            "true_urgency": true_urgency,          # hidden - evaluation only
+            "obs": observations,                   # observable
+            "obs_traffic": noisy(traffic / 2500.0, Config.TRAFFIC_OBS_SD),
+            "obs_delay": noisy(delay / 15.0, Config.DELAY_OBS_SD),
+            "obs_pedestrian": noisy(pedestrian, Config.PEDESTRIAN_OBS_SD),
+            "obs_is_wet": is_rain,                 # observable from weather API
+            "obs_fl_divergence": fl_divergence,    # observable: cosine dist from global model
+        })
+    return segments
 
-                observations.append({
-                    'bus_id': f"BUS_{100 + b}",
-                    'raw_conf': detected_conf,
-                    'camera_quality': camera_quality,
-                    'gps_accuracy': gps_accuracy,
-                    'is_rain': seg['is_rain']
-                })
-            seg['observations'] = observations
 
-    def run_algorithms(self):
-        scores_detector = []
-        scores_naive = []
-        scores_rel_weighted = []
-        scores_operational = []
-        scores_proposed_fusion = []
-        true_urgencies = []
+# ---------------------------------------------------------------------------
+# The five competing methods. Each receives ONLY observable fields.
+# ---------------------------------------------------------------------------
 
-        for seg in self.segments:
-            obs = seg['observations']
-            true_urgencies.append(seg['true_urgency'])
-            raw_confs = [o['raw_conf'] for o in obs]
+def _reliability_weights(obs):
+    return [0.6 * o["camera_quality"] + 0.4 * o["gps_accuracy"] for o in obs]
 
-            # 1. Detector-Only: Maximum raw YOLO confidence
-            scores_detector.append(max(raw_confs) if raw_confs else 0.0)
 
-            # 2. Naive Aggregation: Frequency count of detections >= 0.5
-            scores_naive.append(sum(1 for c in raw_confs if c >= 0.5))
+def _context_score(seg):
+    """Operational consequence, computed from NOISY observed context."""
+    return 0.45 * seg["obs_traffic"] + 0.35 * seg["obs_delay"] + 0.20 * seg["obs_pedestrian"]
 
-            # 3. Reliability-Weighted (Independent assumption)
-            score_rel = sum(o['raw_conf'] * (0.6 * o['camera_quality'] + 0.4 * o['gps_accuracy']) for o in obs)
-            scores_rel_weighted.append(score_rel)
 
-            # 4. Operational Context Only
-            score_ops = (
-                0.50 * (seg['traffic_density'] / 2500.0) +
-                0.30 * (seg['route_delay'] / 15.0) +
-                0.20 * seg['pedestrian_exposure']
-            )
-            scores_operational.append(score_ops)
+def m_detector_only(seg):
+    return max(o["raw_conf"] for o in seg["obs"])
 
-            # 5. Proposed Equinox Correlated Evidence Fusion
-            weights = [(0.6 * o['camera_quality'] + 0.4 * o['gps_accuracy']) for o in obs]
-            weighted_confs = [o['raw_conf'] * w for o, w in zip(obs, weights)]
-            mean_conf = statistics.mean(weighted_confs) if weighted_confs else 0.0
 
-            N = len(obs)
-            rho = seg['rho']
-            n_eff = N / (1.0 + (N - 1) * rho) if N > 1 else 1.0
+def m_naive_count(seg):
+    return sum(1 for o in seg["obs"] if o["raw_conf"] >= 0.5)
 
-            fused_severity = mean_conf * (n_eff / (n_eff + 1.2))
-            consequence_multiplier = (
-                0.45 * (seg['traffic_density'] / 2500.0) +
-                0.35 * (seg['route_delay'] / 15.0) +
-                0.20 * seg['pedestrian_exposure']
-            )
 
-            score_proposed = 0.50 * fused_severity + 0.50 * consequence_multiplier
-            scores_proposed_fusion.append(score_proposed)
+def m_independent(seg):
+    """Reliability-weighted, assumes observations are INDEPENDENT (no discount)."""
+    w = _reliability_weights(seg["obs"])
+    mean_conf = statistics.mean(c * wi for c, wi in
+                                zip((o["raw_conf"] for o in seg["obs"]), w))
+    n = len(seg["obs"])
+    severity = mean_conf * (n / (n + Config.SATURATION_K))
+    return 0.5 * severity + 0.5 * _context_score(seg)
 
-        return {
-            'true_urgency': true_urgencies,
-            'Detector-Only (YOLO max)': scores_detector,
-            'Naive Aggregation (Count)': scores_naive,
-            'Reliability-Weighted (Indep)': scores_rel_weighted,
-            'Operational Context Only': scores_operational,
-            'Proposed Equinox Fusion': scores_proposed_fusion
-        }
 
-    @staticmethod
-    def evaluate_ranking(true_scores, pred_scores, top_k_list=[10, 20, 50]):
-        n = len(true_scores)
-        threshold_idx = int(0.15 * n)
+def m_context_only(seg):
+    return _context_score(seg)
 
-        # Ground truth ranking indices
-        gt_ranked_indices = sorted(range(n), key=lambda i: true_scores[i], reverse=True)
-        ground_truth_top_set = set(gt_ranked_indices[:threshold_idx])
 
-        # Predicted ranking indices
-        pred_ranked_indices = sorted(range(n), key=lambda i: pred_scores[i], reverse=True)
+def m_drishti(seg):
+    """Identical to m_independent EXCEPT evidence is discounted for correlation."""
+    w = _reliability_weights(seg["obs"])
+    mean_conf = statistics.mean(c * wi for c, wi in
+                                zip((o["raw_conf"] for o in seg["obs"]), w))
+    n = len(seg["obs"])
+    # rho estimated from OBSERVABLE weather, not from ground truth
+    rho = Config.RHO_WET if seg["obs_is_wet"] else Config.RHO_DRY
+    n_eff = n / (1.0 + (n - 1) * rho) if n > 1 else 1.0
+    severity = mean_conf * (n_eff / (n_eff + Config.SATURATION_K))
+    return 0.5 * severity + 0.5 * _context_score(seg)
 
-        results = {}
 
-        # Precision@K
-        for k in top_k_list:
-            top_k_pred = set(pred_ranked_indices[:k])
-            hits = len(top_k_pred.intersection(ground_truth_top_set))
-            results[f'P@{k}'] = hits / float(k)
+def m_fl_drishti(seg):
+    """DRISHTI + Federated Learning: discounts BOTH weather AND model correlation.
 
-        # NDCG@K
-        for k in top_k_list:
-            idcg = sum((2**true_scores[gt_ranked_indices[i]] - 1) / math.log2(i + 2) for i in range(k))
-            dcg = sum((2**true_scores[pred_ranked_indices[i]] - 1) / math.log2(i + 2) for i in range(k))
-            results[f'NDCG@{k}'] = (dcg / idcg) if idcg > 0 else 0.0
+    The failure_modes.py adversary exploits the fact that all buses share the
+    same YOLO weights, so model mistakes are perfectly correlated even in clear
+    weather (rho_weather = 0.15, N_eff stays high, phantom escalation occurs).
 
-        # Spearman Correlation
-        results['Spearman_rho'] = spearman_rank_correlation(true_scores, pred_scores)
+    FL causes per-corridor fine-tuning which diverges local weights from the
+    global model. The observable proxy is obs_fl_divergence (cosine distance
+    between local and global weights, 0 = identical, 1 = fully local).
+    As divergence increases, rho_model falls, and N_eff is discounted even when
+    the sky is clear — partially closing the adversarial gap.
+    """
+    w = _reliability_weights(seg["obs"])
+    mean_conf = statistics.mean(c * wi for c, wi in
+                                zip((o["raw_conf"] for o in seg["obs"]), w))
+    n = len(seg["obs"])
 
-        # False Escalation Rate @ 20
-        top_20 = set(pred_ranked_indices[:20])
-        false_alarms = sum(1 for idx in top_20 if idx not in ground_truth_top_set)
-        results['False_Escalation@20'] = (false_alarms / 20.0) * 100.0
+    # Weather-based rho (same as m_drishti)
+    rho_weather = Config.RHO_WET if seg["obs_is_wet"] else Config.RHO_DRY
 
-        return results
+    # Model-based rho: high when weights identical, drops as FL diverges them.
+    # Uses obs_fl_divergence — 0.0 means no FL / same weights for every bus.
+    fl_div = seg.get("obs_fl_divergence", 0.0)
+    rho_model = max(Config.RHO_MODEL_FL_MIN,
+                    Config.RHO_MODEL_SAME * (1.0 - fl_div))
 
-def run_benchmark_trials(num_trials=20):
-    print("=" * 95)
-    print("EQUINOX-FLEET: CORRELATED EVIDENCE FUSION BENCHMARK (E1/E2 EXPERIMENT)")
-    print(f"Simulating {num_trials} Monte-Carlo Trials (500 segments each) across 5 competing models...")
-    print("=" * 95)
+    # Dominant correlation source wins — weather or model, whichever is higher.
+    rho = max(rho_weather, rho_model)
+    n_eff = n / (1.0 + (n - 1) * rho) if n > 1 else 1.0
+    severity = mean_conf * (n_eff / (n_eff + Config.SATURATION_K))
+    return 0.5 * severity + 0.5 * _context_score(seg)
 
-    models = [
-        'Detector-Only (YOLO max)',
-        'Naive Aggregation (Count)',
-        'Reliability-Weighted (Indep)',
-        'Operational Context Only',
-        'Proposed Equinox Fusion'
-    ]
 
-    aggregated = {m: {} for m in models}
+METHODS = [
+    ("1. Detector-Only (max conf)",                   m_detector_only),
+    ("2. Naive Aggregation (count)",                  m_naive_count),
+    ("3. Reliability-Wtd + context (independent)",    m_independent),
+    ("4. Operational Context Only",                   m_context_only),
+    ("5. DRISHTI (weather-corr-aware + context)",     m_drishti),
+    ("6. DRISHTI + FL (weather + model corr-aware)",  m_fl_drishti),
+]
 
-    for trial in range(num_trials):
-        set_seed(1000 + trial)
-        bench = UrbanSimulationBenchmark(num_segments=500, max_buses_per_segment=8)
-        bench.generate_ground_truth_environment()
-        bench.simulate_fleet_observations()
-        predictions = bench.run_algorithms()
-        gt = predictions['true_urgency']
+# Isolation pair A: contribution of weather correlation discount alone
+ISOLATION_PAIR = ("3. Reliability-Wtd + context (independent)",
+                  "5. DRISHTI (weather-corr-aware + context)")
 
-        for m in models:
-            res = bench.evaluate_ranking(gt, predictions[m])
-            for k, val in res.items():
-                if k not in aggregated[m]:
-                    aggregated[m][k] = []
-                aggregated[m][k].append(val)
+# Isolation pair B: additional contribution of model correlation discount (FL)
+FL_ISOLATION_PAIR = ("5. DRISHTI (weather-corr-aware + context)",
+                     "6. DRISHTI + FL (weather + model corr-aware)")
 
-    summary = {}
-    for m in models:
-        summary[m] = {
-            k: (statistics.mean(vals), statistics.stdev(vals) if len(vals) > 1 else 0.0)
-            for k, vals in aggregated[m].items()
-        }
 
-    print("\n" + "=" * 98)
-    print("TABLE 1: BENCHMARK ABLATION RESULTS (Mean ± Std over 20 Independent Monte-Carlo Runs)")
-    print("=" * 98)
-    header = f"{'Method':<30} | {'P@10':<9} | {'P@20':<9} | {'P@50':<9} | {'NDCG@50':<9} | {'Spearman':<9} | {'False Esc@20':<12}"
-    print(header)
-    print("-" * 98)
+# ---------------------------------------------------------------------------
+# Experiment
+# ---------------------------------------------------------------------------
 
-    for m in models:
-        s = summary[m]
-        p10 = f"{s['P@10'][0]:.3f}"
-        p20 = f"{s['P@20'][0]:.3f}"
-        p50 = f"{s['P@50'][0]:.3f}"
-        ndcg50 = f"{s['NDCG@50'][0]:.3f}"
-        spearman = f"{s['Spearman_rho'][0]:.3f}"
-        false_esc = f"{s['False_Escalation@20'][0]:.1f}%"
-        print(f"{m:<30} | {p10:<9} | {p20:<9} | {p50:<9} | {ndcg50:<9} | {spearman:<9} | {false_esc:<12}")
+def run(trials=Config.NUM_TRIALS, verbose=True):
+    per_trial = {name: [] for name, _ in METHODS}
 
-    print("=" * 98)
-    print("\nKEY FINDINGS FOR BEL JUDGES:")
-    print("1. Detector-Only (YOLO max) achieves low P@20 (50.5%) because high camera confidence in suburban")
-    print("   areas falsely outranks severe potholes causing transit bottlenecks in congested corridors.")
-    print("2. Naive Aggregation is easily misled during rain downpours by correlated false alarms.")
-    print("3. Reliability-Weighted (assuming independence) falsely boosts confidence when multiple buses")
-    print("   pass the same puddle under identical rain, leading to a 30%+ False Escalation Rate.")
-    print("4. Proposed Equinox Fusion dominates across all metrics (P@20 = 92.5%, NDCG@50 = 0.887, Spearman = 0.824),")
-    print("   slashing false municipal dispatch escalation from 49.5% down to 7.5%!")
-    print("=" * 98)
+    for t in range(trials):
+        random.seed(1000 + t)
+        # perturb the true policy so no method is tuned to the exact weights
+        policy = {k: v + random.gauss(0, Config.POLICY_JITTER)
+                  for k, v in Config.POLICY.items()}
+        world = make_world(policy)
+        truth = [s["true_urgency"] for s in world]
+        for name, fn in METHODS:
+            per_trial[name].append(evaluate(truth, [fn(s) for s in world]))
 
-    # Save to JSON
-    json_out = {m: {k: round(v[0], 4) for k, v in summary[m].items()} for m in models}
-    with open('benchmark_results.json', 'w') as f:
-        json.dump(json_out, f, indent=2)
-    print("Ablation results successfully serialized to 'benchmark_results.json'.")
+    if verbose:
+        _report(per_trial, trials)
+    return per_trial
 
-if __name__ == '__main__':
-    run_benchmark_trials(num_trials=20)
+
+def _report(per_trial, trials):
+    cols = ["P@10", "P@20", "P@50", "NDCG@50", "Spearman", "FalseEsc@20"]
+    mean = lambda name, k: statistics.mean(r[k] for r in per_trial[name])
+
+    print("=" * 100)
+    print(f"DRISHTI EVIDENCE-FUSION BENCHMARK - {trials} trials x "
+          f"{Config.NUM_SEGMENTS} segments, no oracle access")
+    print("=" * 100)
+    print(f"{'Method':<44} " + " ".join(f"{c:>9}" for c in cols))
+    print("-" * 100)
+    for name, _ in METHODS:
+        print(f"{name:<44} " + " ".join(f"{mean(name, c):>9.3f}" for c in cols))
+    print("=" * 100)
+
+    def _isolation_block(label, pair_a, pair_b):
+        print(f"\n{label}")
+        print(f"  ({pair_b}) minus ({pair_a})")
+        print(f"  {'Metric':<14}{'mean delta':>12}{'95% CI':>24}"
+              f"{'win':>6}{'tie':>6}{'loss':>6}")
+        print("  " + "-" * 68)
+        for c in cols:
+            deltas = [rb[c] - ra[c]
+                      for ra, rb in zip(per_trial[pair_a], per_trial[pair_b])]
+            m = statistics.mean(deltas)
+            half = (1.96 * statistics.stdev(deltas) / math.sqrt(len(deltas))
+                    if len(deltas) > 1 and statistics.stdev(deltas) > 0 else 0.0)
+            gain = (lambda d: -d) if c == "FalseEsc@20" else (lambda d: d)
+            win  = sum(1 for d in deltas if gain(d) >  1e-12)
+            loss = sum(1 for d in deltas if gain(d) < -1e-12)
+            tie  = len(deltas) - win - loss
+            sig  = "*" if (m - half) * (m + half) > 0 else " "
+            print(f"  {c:<14}{m:>+12.4f}{sig}  [{m-half:>+7.4f}, {m+half:>+7.4f}]"
+                  f"{win:>6}{tie:>6}{loss:>6}")
+        print()
+
+    # --- Isolation A: contribution of weather correlation discount ---
+    _isolation_block(
+        "ISOLATED CONTRIBUTION — WEATHER CORRELATION DISCOUNT (method 3 vs 5)",
+        *ISOLATION_PAIR
+    )
+
+    # --- Isolation B: additional contribution of model correlation discount (FL) ---
+    _isolation_block(
+        "ISOLATED CONTRIBUTION — FL MODEL CORRELATION DISCOUNT (method 5 vs 6)",
+        *FL_ISOLATION_PAIR
+    )
+
+    print("  * = 95% CI excludes zero (statistically significant)")
+    print("  Ties are expected on P@K: K is small, so most trials rank identically.")
+    print("  Method 6 improvement over 5 shows how much FL closes the model-"
+          "correlation gap\n  documented in failure_modes.py.\n")
+
+
+def demo():
+    """Self-check: the properties the benchmark must have to be valid."""
+    random.seed(0)
+    world = make_world(Config.POLICY)
+
+    # 1. No method may read ground truth.
+    keys = set(world[0])
+    assert "true_urgency" in keys
+    observable = keys - {"true_urgency"}
+    assert observable == {"obs", "obs_traffic", "obs_delay",
+                          "obs_pedestrian", "obs_is_wet",
+                          "obs_fl_divergence"}, observable
+
+    # 2. Observed context must actually be corrupted, not a copy of truth.
+    ctx = [_context_score(s) for s in world]
+    assert spearman(ctx, [s["true_urgency"] for s in world]) < 0.95, \
+        "observed context is too clean - oracle leak has returned"
+
+    # 3. Correlation discount must reduce effective evidence under rain only.
+    wet = {"obs": [{"raw_conf": .8, "camera_quality": .9, "gps_accuracy": .9}] * 6,
+           "obs_traffic": .5, "obs_delay": .5, "obs_pedestrian": .5, "obs_is_wet": True}
+    dry = dict(wet, obs_is_wet=False)
+    assert m_drishti(wet) < m_independent(wet), "no discount applied in rain"
+    assert m_drishti(dry) < m_independent(dry), "dry rho must still discount"
+    assert m_drishti(wet) < m_drishti(dry), "rain must discount harder than dry"
+
+    # 4. A perfect ranker scores 1.0; a reversed one scores ~0.
+    truth = [s["true_urgency"] for s in world]
+    assert evaluate(truth, truth)["P@10"] == 1.0
+    assert evaluate(truth, [-t for t in truth])["P@10"] == 0.0
+
+    print("demo(): all benchmark validity checks passed\n")
+
+
+if __name__ == "__main__":
+    demo()
+    run()
