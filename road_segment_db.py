@@ -13,7 +13,7 @@ A road that was never observed cannot produce evidence of any kind.
   UNOBSERVED         - No valid sensing opportunity has occurred yet
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 # --- Delhi NCR Road Segment Registry ---
 # Each segment represents a monitored arterial corridor.
@@ -120,6 +120,36 @@ class RoadSegmentDB:
                 "last_updated": None,
             }
 
+    def register_discovered_segment(self, segment_id, lat, lng, route_id):
+        """Add a segment first seen by a bus rather than seeded from the registry.
+
+        expected_daily_passes is 0 because nobody has surveyed the headway
+        here: coverage_pct stays 0 and the segment reads UNOBSERVED until real
+        passes accumulate. That is the honest answer - inventing an expected
+        count would fabricate the denominator the coverage claim rests on.
+        """
+        self.segments[segment_id] = {
+            "segment_id": segment_id,
+            "name": f"Unsurveyed segment {segment_id}",
+            "corridor": "Discovered by fleet",
+            "lat": lat, "lng": lng,
+            "routes": [route_id] if route_id else [],
+            "expected_daily_passes": 0,
+            "discovered_by_fleet": True,
+            "actual_passes": 0,
+            "usable_observations": 0,
+            "positive_detections": [],
+            "null_observations": 0,
+            "routes_that_detected": set(),
+            "routes_that_passed_clean": set(),
+            "detection_history": [],
+            "state": "UNOBSERVED",
+            "state_confidence": 0.0,
+            "dominant_hazard": None,
+            "last_updated": None,
+        }
+        return self.segments[segment_id]
+
     def record_bus_pass(self, segment_id, route_id, has_detection, fused_event=None):
         """
         Record one bus pass on a road segment.
@@ -128,11 +158,18 @@ class RoadSegmentDB:
         fused_event: The full FusionEngine output dict (if has_detection=True)
         """
         if segment_id not in self.segments:
-            return None
+            # A fleet-sourced system discovers roads; the registry is a seed,
+            # not the whole city. Returning None here silently threw the pass
+            # away - the detection was stored but never reached the belief
+            # model, so a real pothole on any unlisted road just vanished.
+            if fused_event is None or fused_event.get("lat") is None:
+                return None          # no position: nothing we could map it to
+            self.register_discovered_segment(
+                segment_id, fused_event["lat"], fused_event["lng"], route_id)
         
         seg = self.segments[segment_id]
         seg["actual_passes"] += 1
-        seg["last_updated"] = datetime.utcnow().isoformat() + "Z"
+        seg["last_updated"] = datetime.now(timezone.utc).isoformat()
 
         if has_detection and fused_event:
             n_eff = fused_event.get("effective_passes_neff", 1.0)
@@ -239,7 +276,7 @@ class RoadSegmentDB:
         """Returns a city-wide coverage table — the key insight from md.md."""
         report = []
         for seg_id, seg in self.segments.items():
-            expected = ROAD_SEGMENT_REGISTRY[seg_id]["expected_daily_passes"]
+            expected = seg.get("expected_daily_passes", 0)
             actual = seg["actual_passes"]
             coverage_pct = round((actual / expected * 100) if expected > 0 else 0, 1)
             report.append({

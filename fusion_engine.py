@@ -7,7 +7,7 @@ with OSINT (Weather) and Civic (MCD 311) data to eliminate false positives.
 import json
 import urllib.request
 import urllib.error
-from datetime import datetime
+from datetime import datetime, timezone
 
 class FusionEngine:
     def __init__(self):
@@ -114,7 +114,7 @@ class FusionEngine:
             "escalation_reason": " + ".join(escalation_reason),
             "lat": lat,
             "lng": lng,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "is_actionable": priority_level in ["HIGH", "CRITICAL EMERGENCY"]
         }
         

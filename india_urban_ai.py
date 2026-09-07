@@ -20,7 +20,7 @@ import math
 import time
 import urllib.request
 import urllib.error
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import numpy as np
 from sklearn.ensemble import IsolationForest
 
@@ -588,7 +588,7 @@ class DrishtiIndianAIOrchestrator:
         return {
             "corridor_code": segment_id,
             "corridor_name": segment_meta["name"],
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "layer_1_features": features,
             "layer_2_sensor_fusion": fused,
             "layer_3_anomaly_detection": anomaly,

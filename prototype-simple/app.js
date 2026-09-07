@@ -521,22 +521,83 @@ async function fetchAndRenderAlerts() {
             return;
         }
 
-        feedList.innerHTML = detections.slice().reverse().slice(0, 25).map(det => `
+        feedList.innerHTML = detections.slice().reverse().slice(0, 25).map(det => {
+            // The backend stamps `received_at`; the record has no `timestamp`
+            // at all, so every row in this feed read "Invalid Date".
+            const ts = new Date(det.received_at || det.timestamp);
+            const f = det.fusion_result || {};
+            const ai = det.urban_ai || {};
+            // Fusion IS the contribution. Showing only the raw edge confidence
+            // hid the one number that distinguishes this from a dashcam app.
+            const fusionRow = (f.fused_confidence === undefined) ? '' : `
+                <div class="feed-fusion">
+                    <span class="fusion-arrow">${(f.raw_confidence * 100).toFixed(0)}% &rarr; <b>${(f.fused_confidence * 100).toFixed(0)}%</b></span>
+                    <span title="Effective independent passes after correlation discount">N_eff ${Number(f.effective_passes_neff).toFixed(2)}/${f.total_bus_passes}</span>
+                    <span title="Observation correlation">&rho; ${f.correlation_rho}</span>
+                </div>
+                <div class="feed-reason">${f.priority_level || ''}${f.escalation_reason ? ' &bull; ' + f.escalation_reason : ''}</div>`;
+            const health = ai.layer_4_road_health;
+            const causes = ((ai.layer_7_root_cause || {}).diagnosed_root_causes || []);
+            const aiRow = !health ? '' : `
+                <div class="feed-reason">RHI ${health.road_health_index}/100 (${health.category}) &bull; +${(ai.layer_12_route_delay || {}).current_corridor_delay_minutes ?? '?'} min corridor delay</div>
+                <div class="feed-reason">${causes[0] || ''}</div>`;
+            return `
             <div class="feed-item ${det.confidence > 0.85 ? 'feed-critical' : ''}" style="cursor: pointer;" onclick="map.setView([${det.lat}, ${det.lng}], 16)">
                 <div class="feed-header">
                     <span class="feed-bus">${det.bus_id}</span>
-                    <span class="feed-time">${new Date(det.timestamp).toLocaleTimeString()}</span>
+                    <span class="feed-time">${isNaN(ts) ? '--:--:--' : ts.toLocaleTimeString()}</span>
                 </div>
-                <div class="feed-event">${det.hazard_type} Detected</div>
+                <div class="feed-event">${det.hazard_type} Detected${f.is_actionable ? ' &bull; ACTIONABLE' : ''}</div>
                 <div class="feed-meta">
                     <span class="conf-tag ${det.confidence > 0.85 ? 'conf-high' : 'conf-med'}">${(det.confidence * 100).toFixed(1)}%</span>
                     <span>${det.lat.toFixed(4)}°N, ${det.lng.toFixed(4)}°E</span>
                 </div>
-            </div>
-        `).join('');
+                ${fusionRow}
+                ${aiRow}
+            </div>`;
+        }).join('');
     } catch (e) {
         console.log('[DRISHTI] Failed to fetch live alerts (offline)');
     }
+}
+
+// Surfaces the ingest reply. Every field below was already on the wire and
+// never read: raw vs fused confidence, N_eff, rho, segment state, and the
+// 12-layer output (explanation, PWD cost, predicted route delay).
+function renderFusionVerdict(ingest) {
+    const host = document.getElementById('fusion-verdict');
+    if (!host || !ingest) return;
+    const f = ingest.fusion_intelligence || {};
+    const ai = ingest.urban_ai || {};
+    const xai = ai.layer_8_explainable_ai || {};
+    const wo = ai.layer_9_pwd_work_order || {};
+    // ai.status is set only when the layers did NOT run - say which, and why.
+    const boq = wo.bill_of_quantities || {};
+    const delay = ai.layer_12_route_delay || {};
+    const layers = ai.status
+        ? `<div class="verdict-note">12-layer AI: ${ai.status}${ai.reason ? ' &mdash; ' + ai.reason : ''}</div>`
+        : `<div class="verdict-note">${xai.observation || ''}</div>
+           <div class="verdict-note">${xai.evidence || ''}</div>
+           <div class="verdict-note">${xai.road_health_verdict || ''} Cause: ${xai.root_cause_explanation || 'n/a'}</div>
+           <div class="verdict-note">${wo.action_tier || ''} &bull; ${wo.target_department || ''} &bull; SLA ${wo.contractor_sla_hours ?? '?'}h
+               &bull; ${boq.estimated_repair_area_sqm ?? '?'} sqm, &#8377;${boq.estimated_material_cost_inr ?? '?'} (${boq.irc_specification || 'IRC spec n/a'})</div>
+           <div class="verdict-note">${delay.advisory || ''} ~${delay.estimated_delayed_commuters ?? '?'} commuters affected</div>`;
+    host.innerHTML = `
+        <div class="verdict-line"><b>${f.priority_level || 'PENDING'}</b>${f.escalation_reason ? ' &mdash; ' + f.escalation_reason : ''}</div>
+        <div class="verdict-line">confidence ${(f.raw_confidence * 100).toFixed(0)}% &rarr; <b>${(f.fused_confidence * 100).toFixed(0)}%</b>
+            &bull; N_eff ${Number(f.effective_passes_neff).toFixed(2)}/${f.total_bus_passes} &bull; &rho; ${f.correlation_rho}</div>
+        <div class="verdict-line">segment: ${(ingest.road_segment_state || {}).state || 'UNKNOWN'} &bull; uplink ${ingest.bandwidth_bytes} bytes</div>
+        ${layers}`;
+    host.classList.remove('hidden');
+}
+
+// /api/segments/state ships key_insight - the whole argument for UNOBSERVED
+// being a state rather than a blank. It was fetched and dropped every poll.
+function showKeyInsight(text) {
+    const el = document.getElementById('belief-insight');
+    if (!el || !text) return;
+    el.textContent = text;
+    el.classList.remove('hidden');
 }
 
 function initAlertFeed() {
@@ -766,7 +827,7 @@ const DEMO_STEPS = [
             selectScenario('seg-b');
             // Gap 3: POST real telemetry to the backend so /api/detections has live data
             try {
-                await fetch('http://localhost:8080/api/edge/telemetry', {
+                const res = await fetch('http://localhost:8080/api/edge/telemetry', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -776,11 +837,23 @@ const DEMO_STEPS = [
                         lat: 28.6315,
                         lng: 77.2167,
                         depth_mm: 48,
-                        segment_id: 'SEG-001',
-                        route_id: 'Route 402'
+                        segment_id: 'DEL-RING-01',
+                        route_id: 'Route 402',
+                        // Without these four streams the backend declines to run
+                        // the 12 AI layers rather than invent their inputs.
+                        gps: { speed_kmh: 18.0, prev_speed_kmh: 44.0 },
+                        imu: { az_g: 1.9, ax_g: 0.4, vibration_rms_g: 0.55 },
+                        can: { brake_pressure_bar: 6.2, rpm_drop: 900 },
+                        camera: { pothole_probability: 0.88,
+                                  detections: { two_wheeler: 6, person: 3 } }
                     })
                 });
-                console.log('[DRISHTI] Live telemetry posted to backend — /api/detections now has real data');
+                if (!res.ok) throw new Error('telemetry rejected: HTTP ' + res.status);
+                // The reply carries the fusion verdict and all 12 AI layers.
+                // Discarding it threw away the entire analysis.
+                const ingest = await res.json();
+                renderFusionVerdict(ingest);
+                console.log('[DRISHTI] Fusion verdict', ingest.fusion_intelligence);
                 // Refresh work orders panel
                 fetchAndRenderWorkOrders();
             } catch(e) {
@@ -1136,6 +1209,7 @@ async function renderRoadBeliefLayer() {
         const res = await fetch('http://localhost:8080/api/segments/state');
         const data = await res.json();
         segments = data.segments || [];
+        showKeyInsight(data.key_insight);
     } catch(e) {
         console.warn('[DRISHTI] Backend offline — road belief layer requires a running backend server (python drishti_api.py).', e);
         // Show an offline notice on the map instead of fabricated data

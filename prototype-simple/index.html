@@ -149,9 +149,16 @@
                             <button class="active" onclick="document.getElementById('alert-feed-list').style.display='block'; document.getElementById('work-orders-list').style.display='none'; this.classList.add('active'); this.nextElementSibling.classList.remove('active');">Detections</button>
                             <button onclick="document.getElementById('alert-feed-list').style.display='none'; document.getElementById('work-orders-list').style.display='block'; this.classList.add('active'); this.previousElementSibling.classList.remove('active');">Work Orders <span id="wo-count-badge" style="background:#ff2d55; color:#fff; border-radius:4px; padding:0 4px; font-size:9px; margin-left:4px; display:none;">0</span></button>
                         </div>
+                        <!-- Fusion verdict from the ingest reply. The dashboard
+                             POSTed telemetry and threw the whole response away,
+                             so none of this ever reached the screen. -->
+                        <div id="fusion-verdict" class="fusion-verdict hidden"></div>
                         <div class="feed-list" id="alert-feed-list">
                             <!-- Populated by JS -->
                         </div>
+                        <!-- key_insight from /api/segments/state: the reason
+                             UNOBSERVED is not the same as "clear". -->
+                        <div id="belief-insight" class="belief-insight hidden"></div>
                         <div class="feed-list" id="work-orders-list" style="display:none;">
                             <!-- Populated by JS -->
                         </div>
