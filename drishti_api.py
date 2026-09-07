@@ -16,6 +16,7 @@ import json
 import urllib.parse
 from datetime import datetime
 from fusion_engine import FusionEngine
+from road_segment_db import RoadSegmentDB
 
 PORT = 8080
 
@@ -43,6 +44,47 @@ DATABASE = {
 
 # Initialize the Multi-Modal Fusion Engine
 fusion_engine = FusionEngine()
+
+# Initialize the 5-State Road Segment Database
+road_db = RoadSegmentDB()
+
+# Pre-seed some segment observations so the map is informative on first load
+road_db.record_bus_pass("SEG-001", "Route 402", has_detection=True,
+    fused_event={"hazard_type":"Pothole","raw_confidence":0.89,"fused_confidence":0.92,
+        "total_bus_passes":7,"effective_passes_neff":3.8,"weather_context":{"humidity":91,"precipitation":0},
+        "correlation_rho":0.72,"priority_level":"CRITICAL EMERGENCY",
+        "escalation_reason":"Citizen Corroborated (MCD 311)","lat":28.6315,"lng":77.2167,
+        "timestamp":"2026-09-07T04:00:00Z","is_actionable":True})
+road_db.record_bus_pass("SEG-001", "Route 119", has_detection=True,
+    fused_event={"hazard_type":"Pothole","raw_confidence":0.84,"fused_confidence":0.90,
+        "total_bus_passes":7,"effective_passes_neff":3.8,"weather_context":{"humidity":91,"precipitation":0},
+        "correlation_rho":0.72,"priority_level":"CRITICAL EMERGENCY",
+        "escalation_reason":"High Fleet Persistence","lat":28.6315,"lng":77.2167,
+        "timestamp":"2026-09-07T06:30:00Z","is_actionable":True})
+road_db.record_bus_pass("SEG-002", "Route 221", has_detection=False)
+road_db.record_bus_pass("SEG-002", "Route 221", has_detection=False)
+road_db.record_bus_pass("SEG-002", "Route 534", has_detection=False)
+road_db.record_bus_pass("SEG-002", "Route 534", has_detection=False)
+road_db.record_bus_pass("SEG-002", "Route 221", has_detection=False)
+road_db.record_bus_pass("SEG-003", "Route 880", has_detection=True,
+    fused_event={"hazard_type":"Waterlogging","raw_confidence":0.94,"fused_confidence":0.94,
+        "total_bus_passes":1,"effective_passes_neff":1.0,"weather_context":{"humidity":95,"precipitation":2.1},
+        "correlation_rho":0.85,"priority_level":"HIGH",
+        "escalation_reason":"High Fleet Persistence","lat":28.5680,"lng":77.2090,
+        "timestamp":"2026-09-07T07:15:00Z","is_actionable":True})
+road_db.record_bus_pass("SEG-006", "Route 402", has_detection=False)
+road_db.record_bus_pass("SEG-006", "Route 119", has_detection=False)
+road_db.record_bus_pass("SEG-006", "Route 221", has_detection=False)
+road_db.record_bus_pass("SEG-006", "Route 534", has_detection=False)
+road_db.record_bus_pass("SEG-006", "Route 402", has_detection=False)
+road_db.record_bus_pass("SEG-006", "Route 119", has_detection=False)
+road_db.record_bus_pass("SEG-007", "Route 119", has_detection=True,
+    fused_event={"hazard_type":"Signage Defect","raw_confidence":0.72,"fused_confidence":0.72,
+        "total_bus_passes":1,"effective_passes_neff":1.0,"weather_context":{"humidity":88,"precipitation":0},
+        "correlation_rho":0.72,"priority_level":"LOW (MONITOR)",
+        "escalation_reason":"Isolated Detection","lat":28.6394,"lng":77.1635,
+        "timestamp":"2026-09-07T08:00:00Z","is_actionable":False})
+# SEG-004 and SEG-005 stay UNOBSERVED to demonstrate the 5th state
 
 class DrishtiAPIHandler(BaseHTTPRequestHandler):
 
@@ -75,6 +117,8 @@ class DrishtiAPIHandler(BaseHTTPRequestHandler):
                     "GET  /api/detections",
                     "POST /api/edge/telemetry",
                     "GET  /api/fusion/status",
+                    "GET  /api/segments/state",
+                    "GET  /api/segments/coverage",
                     "GET  /api/equinox/workorders",
                     "POST /api/equinox/dispatch"
                 ]
@@ -102,6 +146,25 @@ class DrishtiAPIHandler(BaseHTTPRequestHandler):
                 "active_context": "Open-Meteo Synoptic Weather",
                 "current_weather": weather,
                 "current_environmental_correlation_rho": rho
+            }, indent=2).encode('utf-8'))
+
+        elif path == "/api/segments/state":
+            # The 5-State Road Belief Model — the core research contribution
+            self._set_headers(200)
+            self.wfile.write(json.dumps({
+                "model": "DRISHTI 5-State Road Belief Model",
+                "states": ["CONFIRMED_DEFECT","PROBABLE_DEFECT","UNCERTAIN","PROBABLY_CLEAR","UNOBSERVED"],
+                "key_insight": "UNOBSERVED means no bus had a valid sensing opportunity — absence of detection is NOT evidence of absence.",
+                "segment_count": len(road_db.segments),
+                "segments": road_db.get_all_states()
+            }, indent=2).encode('utf-8'))
+
+        elif path == "/api/segments/coverage":
+            # Coverage table showing expected vs actual observations per road segment
+            self._set_headers(200)
+            self.wfile.write(json.dumps({
+                "title": "DRISHTI City-Wide Road Coverage Report",
+                "coverage": road_db.get_coverage_report()
             }, indent=2).encode('utf-8'))
 
         elif path == "/api/equinox/workorders":
@@ -157,6 +220,16 @@ class DrishtiAPIHandler(BaseHTTPRequestHandler):
             # Fuse the event
             fused_event = fusion_engine.fuse_event(raw_event, historical_mock, mcd311_mock)
             
+            # --- UPDATE ROAD SEGMENT STATE MACHINE ---
+            # Map the incoming GPS to the nearest road segment (simplified nearest-match)
+            segment_id = payload.get("segment_id", "SEG-001")  # Default if not provided
+            route_id = payload.get("route_id", "Unknown Route")
+            segment_state = road_db.record_bus_pass(
+                segment_id, route_id,
+                has_detection=True,
+                fused_event=fused_event
+            )
+
             # Combine raw and fused for storage
             final_record = {**raw_event, "fusion_result": fused_event}
             DATABASE["detections"].append(final_record)
@@ -167,7 +240,8 @@ class DrishtiAPIHandler(BaseHTTPRequestHandler):
                 "bandwidth_bytes": len(post_body),
                 "bandwidth_saved_pct": "99.8%",
                 "raw_event": raw_event,
-                "fusion_intelligence": fused_event
+                "fusion_intelligence": fused_event,
+                "road_segment_state": road_db.get_segment_state(segment_id)
             }, indent=2).encode('utf-8'))
 
         # 2. Automated Dispatch into BEL Equinox (NGSI-LD Standard)

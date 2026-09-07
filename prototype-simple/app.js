@@ -1178,3 +1178,150 @@ function downloadIncidentReport() {
 
     console.log('✅ [DRISHTI] ETSI NGSI-LD Incident Report downloaded successfully.');
 }
+
+// ============================================================
+//  DRISHTI 5-STATE ROAD BELIEF MODEL — Map Layer
+// ============================================================
+
+const STATE_STYLES = {
+    CONFIRMED_DEFECT:  { color: '#ff2d55', weight: 7, opacity: 0.95, label: 'Confirmed Defect',  icon: '🔴' },
+    PROBABLE_DEFECT:   { color: '#ff9500', weight: 6, opacity: 0.85, label: 'Probable Defect',   icon: '🟠' },
+    UNCERTAIN:         { color: '#ffcc00', weight: 5, opacity: 0.80, label: 'Uncertain',          icon: '🟡' },
+    PROBABLY_CLEAR:    { color: '#34c759', weight: 5, opacity: 0.75, label: 'Probably Clear',     icon: '🟢' },
+    UNOBSERVED:        { color: '#636366', weight: 4, opacity: 0.60, label: 'Unobserved',         icon: '⬛' },
+};
+
+let roadBeliefLayer = null;
+let roadBeliefLayerActive = false;
+
+async function toggleRoadBeliefLayer() {
+    const btn = document.getElementById('btn-road-belief');
+    if (roadBeliefLayerActive) {
+        if (roadBeliefLayer) { roadBeliefLayer.remove(); roadBeliefLayer = null; }
+        roadBeliefLayerActive = false;
+        if (btn) btn.classList.remove('active');
+        hideLegend('belief-legend');
+        return;
+    }
+    roadBeliefLayerActive = true;
+    if (btn) btn.classList.add('active');
+    await renderRoadBeliefLayer();
+    showBeliefLegend();
+}
+
+async function renderRoadBeliefLayer() {
+    if (roadBeliefLayer) { roadBeliefLayer.remove(); roadBeliefLayer = null; }
+
+    let segments = [];
+    try {
+        const res = await fetch('http://localhost:8080/api/segments/state');
+        const data = await res.json();
+        segments = data.segments || [];
+    } catch(e) {
+        console.warn('[DRISHTI] Could not fetch segment states from API, using demo data.', e);
+        // Demo fallback so the layer still works without the backend running
+        segments = getDemoSegments();
+    }
+
+    const group = L.layerGroup();
+
+    segments.forEach(seg => {
+        const style = STATE_STYLES[seg.state] || STATE_STYLES.UNOBSERVED;
+
+        // Draw a small polyline around the GPS point to represent the segment
+        const lat = seg.lat, lng = seg.lng;
+        const offset = 0.007;
+        const polyline = L.polyline([
+            [lat - offset * 0.3, lng - offset],
+            [lat + offset * 0.3, lng + offset]
+        ], {
+            color: style.color,
+            weight: style.weight,
+            opacity: style.opacity
+        });
+
+        const popupHtml = `
+            <div style="font-family:var(--font-mono,monospace);min-width:260px;background:#0d1117;color:#e6edf3;border-radius:8px;padding:12px;">
+                <div style="font-size:11px;color:#8b949e;margin-bottom:6px;">${seg.segment_id}</div>
+                <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${seg.name}</div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                    <span style="background:${style.color};color:#000;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">${style.icon} ${seg.state.replace(/_/g,' ')}</span>
+                    <span style="font-size:12px;color:#8b949e;">Confidence: ${Math.round(seg.state_confidence * 100)}%</span>
+                </div>
+                <div style="font-size:11px;color:#8b949e;line-height:1.6;">
+                    <div>Routes: ${seg.routes.join(', ') || 'None assigned'}</div>
+                    <div>Passes today: ${seg.actual_passes} / ${seg.expected_daily_passes} expected</div>
+                    <div>Usable observations: ${seg.usable_observations}</div>
+                    <div>Defect detections: ${seg.detection_count}</div>
+                    ${seg.dominant_hazard ? `<div style="color:${style.color};margin-top:4px;">⚠ ${seg.dominant_hazard}</div>` : ''}
+                </div>
+                <div style="margin-top:8px;padding-top:8px;border-top:1px solid #30363d;font-size:10px;color:#6e7681;">
+                    ${seg.state === 'UNOBSERVED' ? '⚠ No bus has had a valid sensing opportunity on this segment.' : `Last updated: ${seg.last_updated ? seg.last_updated.slice(0,16).replace('T',' ') + ' UTC' : 'N/A'}`}
+                </div>
+            </div>
+        `;
+
+        polyline.bindPopup(popupHtml, { maxWidth: 320 });
+        group.addLayer(polyline);
+
+        // Add state marker
+        const markerIcon = L.divIcon({
+            html: `<div style="background:${style.color};color:${seg.state==='UNOBSERVED'?'#fff':'#000'};border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.5);">${style.icon}</div>`,
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
+            className: ''
+        });
+        const marker = L.marker([lat, lng], { icon: markerIcon });
+        marker.bindPopup(popupHtml, { maxWidth: 320 });
+        group.addLayer(marker);
+    });
+
+    roadBeliefLayer = group;
+    group.addTo(map);
+}
+
+function showBeliefLegend() {
+    let legend = document.getElementById('belief-legend');
+    if (legend) { legend.style.display = 'block'; return; }
+
+    legend = document.createElement('div');
+    legend.id = 'belief-legend';
+    legend.style.cssText = `
+        position:absolute;bottom:140px;right:16px;z-index:1000;
+        background:rgba(13,17,23,0.95);border:1px solid rgba(255,255,255,0.1);
+        border-radius:10px;padding:14px 16px;min-width:200px;
+        font-family:var(--font-mono,monospace);
+    `;
+    legend.innerHTML = `
+        <div style="font-size:10px;color:#8b949e;letter-spacing:1px;margin-bottom:10px;">DRISHTI 5-STATE BELIEF MODEL</div>
+        ${Object.entries(STATE_STYLES).map(([k, s]) => `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <div style="width:24px;height:4px;background:${s.color};border-radius:2px;"></div>
+                <span style="font-size:11px;color:#e6edf3;">${s.icon} ${s.label}</span>
+            </div>
+        `).join('')}
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid #30363d;font-size:9px;color:#6e7681;line-height:1.5;">
+            ⬛ UNOBSERVED ≠ Clear<br>No bus had a sensing opportunity.
+        </div>
+    `;
+    document.getElementById('map-container')?.appendChild(legend);
+}
+
+function hideLegend(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+}
+
+function getDemoSegments() {
+    // Fallback demo data matching the 7 segments in road_segment_db.py
+    return [
+        { segment_id:'SEG-001', name:'Connaught Place Radial 3', lat:28.6315, lng:77.2167, routes:['Route 402','Route 119'], expected_daily_passes:42, actual_passes:2, usable_observations:2, detection_count:2, null_observations:0, state:'CONFIRMED_DEFECT', state_confidence:0.97, dominant_hazard:'Pothole', last_updated:'2026-09-07T06:30:00Z' },
+        { segment_id:'SEG-002', name:'Vikas Marg (ITO to Laxmi Nagar)', lat:28.6280, lng:77.2750, routes:['Route 221','Route 534'], expected_daily_passes:28, actual_passes:5, usable_observations:5, detection_count:0, null_observations:5, state:'PROBABLY_CLEAR', state_confidence:0.90, dominant_hazard:null, last_updated:'2026-09-07T06:00:00Z' },
+        { segment_id:'SEG-003', name:'AIIMS Junction - Ring Road', lat:28.5680, lng:77.2090, routes:['Route 880'], expected_daily_passes:12, actual_passes:1, usable_observations:1, detection_count:1, null_observations:0, state:'PROBABLE_DEFECT', state_confidence:0.60, dominant_hazard:'Waterlogging', last_updated:'2026-09-07T07:15:00Z' },
+        { segment_id:'SEG-004', name:'Naraina Industrial Area Road', lat:28.6194, lng:77.1295, routes:['Route 781'], expected_daily_passes:8, actual_passes:0, usable_observations:0, detection_count:0, null_observations:0, state:'UNOBSERVED', state_confidence:0.0, dominant_hazard:null, last_updated:null },
+        { segment_id:'SEG-005', name:'Outer Ring Road (Dhaula Kuan)', lat:28.5952, lng:77.1673, routes:[], expected_daily_passes:0, actual_passes:0, usable_observations:0, detection_count:0, null_observations:0, state:'UNOBSERVED', state_confidence:0.0, dominant_hazard:null, last_updated:null },
+        { segment_id:'SEG-006', name:'Janpath (Connaught Place)', lat:28.6139, lng:77.2179, routes:['Route 402','Route 119','Route 221','Route 534'], expected_daily_passes:55, actual_passes:6, usable_observations:6, detection_count:0, null_observations:6, state:'PROBABLY_CLEAR', state_confidence:0.95, dominant_hazard:null, last_updated:'2026-09-07T08:00:00Z' },
+        { segment_id:'SEG-007', name:'Shivaji Marg (Patel Nagar)', lat:28.6394, lng:77.1635, routes:['Route 119'], expected_daily_passes:14, actual_passes:1, usable_observations:1, detection_count:1, null_observations:0, state:'PROBABLE_DEFECT', state_confidence:0.60, dominant_hazard:'Signage Defect', last_updated:'2026-09-07T08:00:00Z' },
+    ];
+}
+
